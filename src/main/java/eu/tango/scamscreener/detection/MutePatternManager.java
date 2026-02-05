@@ -69,6 +69,9 @@ public final class MutePatternManager {
 		if (message == null || message.isBlank() || compiledPatterns.isEmpty()) {
 			return false;
 		}
+		if (isScamScreenerMessage(message)) {
+			return false;
+		}
 		for (Pattern pattern : compiledPatterns) {
 			if (pattern.matcher(message).find()) {
 				blockedSinceLastNotify++;
@@ -145,6 +148,17 @@ public final class MutePatternManager {
 		}
 		String trimmed = rawPattern.trim();
 		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private static boolean isScamScreenerMessage(String message) {
+		String trimmed = message.trim();
+		if (trimmed.startsWith("[ScamScreener]")) {
+			return true;
+		}
+
+		// Visual warning card without prefix.
+		return trimmed.contains("RISKY MESSAGE")
+			|| trimmed.startsWith("====================================");
 	}
 
 	public enum AddResult {
