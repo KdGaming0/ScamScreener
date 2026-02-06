@@ -25,6 +25,8 @@ public final class ScamScreenerCommands {
 	private final CaptureBulkHandler captureBulkHandler;
 	private final MigrateTrainingHandler migrateTrainingHandler;
 	private final ModelUpdateHandler modelUpdateHandler;
+	private final UpdateCheckHandler updateCheckHandler;
+	private final EmailBypassHandler emailBypassHandler;
 	private final java.util.function.Consumer<Boolean> setAllDebugHandler;
 	private final java.util.function.BiConsumer<String, Boolean> setDebugKeyHandler;
 	private final java.util.function.Supplier<java.util.Map<String, Boolean>> debugStateSupplier;
@@ -43,6 +45,8 @@ public final class ScamScreenerCommands {
 		CaptureBulkHandler captureBulkHandler,
 		MigrateTrainingHandler migrateTrainingHandler,
 		ModelUpdateHandler modelUpdateHandler,
+		UpdateCheckHandler updateCheckHandler,
+		EmailBypassHandler emailBypassHandler,
 		java.util.function.Consumer<Boolean> setAllDebugHandler,
 		java.util.function.BiConsumer<String, Boolean> setDebugKeyHandler,
 		java.util.function.Supplier<java.util.Map<String, Boolean>> debugStateSupplier,
@@ -60,6 +64,8 @@ public final class ScamScreenerCommands {
 		this.captureBulkHandler = captureBulkHandler;
 		this.migrateTrainingHandler = migrateTrainingHandler;
 		this.modelUpdateHandler = modelUpdateHandler;
+		this.updateCheckHandler = updateCheckHandler;
+		this.emailBypassHandler = emailBypassHandler;
 		this.setAllDebugHandler = setAllDebugHandler;
 		this.setDebugKeyHandler = setDebugKeyHandler;
 		this.debugStateSupplier = debugStateSupplier;
@@ -89,12 +95,14 @@ public final class ScamScreenerCommands {
 			.then(ListCommand.build(blacklist, reply))
 			.then(MuteCommand.build(mutePatternManager, reply))
 			.then(UnmuteCommand.build(mutePatternManager, reply))
+			.then(EmailBypassCommand.build(emailBypassHandler, reply))
 			.then(AiCommand.build(
 				captureByPlayerHandler,
 				captureByMessageHandler,
 				captureBulkHandler,
 				migrateTrainingHandler,
 				modelUpdateHandler,
+				updateCheckHandler,
 				trainHandler,
 				resetAiHandler,
 				reply
@@ -129,5 +137,15 @@ public final class ScamScreenerCommands {
 	@FunctionalInterface
 	public interface ModelUpdateHandler {
 		int handle(String action, String id);
+	}
+
+	@FunctionalInterface
+	public interface UpdateCheckHandler {
+		int check(boolean force);
+	}
+
+	@FunctionalInterface
+	public interface EmailBypassHandler {
+		int bypass(String id);
 	}
 }

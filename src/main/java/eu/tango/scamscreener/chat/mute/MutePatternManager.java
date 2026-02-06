@@ -15,6 +15,7 @@ public final class MutePatternManager {
 
 	private final Set<String> patterns = new LinkedHashSet<>();
 	private final List<Pattern> compiledPatterns = new ArrayList<>();
+	private boolean enabled = true;
 	private boolean notifyEnabled = true;
 	private int notifyIntervalSeconds = 30;
 	private long lastNotifyMillis = System.currentTimeMillis();
@@ -27,6 +28,7 @@ public final class MutePatternManager {
 		for (String pattern : cfg.patterns) {
 			tryAddPattern(pattern);
 		}
+		enabled = cfg.enabled == null ? true : cfg.enabled;
 		notifyEnabled = cfg.notifyEnabled;
 		notifyIntervalSeconds = cfg.notifyIntervalSeconds;
 	}
@@ -66,7 +68,7 @@ public final class MutePatternManager {
 	}
 
 	public boolean shouldBlock(String message) {
-		if (message == null || message.isBlank() || compiledPatterns.isEmpty()) {
+		if (!enabled || message == null || message.isBlank() || compiledPatterns.isEmpty()) {
 			return false;
 		}
 		if (isScamScreenerMessage(message)) {
@@ -82,10 +84,22 @@ public final class MutePatternManager {
 	}
 
 	public boolean shouldNotifyNow(long nowMillis) {
-		if (!notifyEnabled) {
+		if (!enabled || !notifyEnabled) {
 			return false;
 		}
 		return nowMillis - lastNotifyMillis >= (long) notifyIntervalSeconds * 1000L;
+	}
+
+	public void setEnabled(boolean enabled) {
+		if (this.enabled == enabled) {
+			return;
+		}
+		this.enabled = enabled;
+		save();
+	}
+
+	public boolean isEnabled() {
+		return enabled;
 	}
 
 	public int consumeBlockedCount(long nowMillis) {
@@ -141,6 +155,7 @@ public final class MutePatternManager {
 	private void save() {
 		MutePatternsConfig cfg = new MutePatternsConfig();
 		cfg.patterns = allPatterns();
+		cfg.enabled = enabled;
 		cfg.notifyEnabled = notifyEnabled;
 		cfg.notifyIntervalSeconds = notifyIntervalSeconds;
 		MutePatternsConfig.save(cfg);

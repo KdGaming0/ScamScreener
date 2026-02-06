@@ -20,6 +20,11 @@ final class UnmuteCommand {
 		Consumer<Component> reply
 	) {
 		return ClientCommandManager.literal("unmute")
+			.executes(context -> {
+				mutePatternManager.setEnabled(false);
+				reply.accept(Messages.muteDisabled());
+				return 1;
+			})
 			.then(ClientCommandManager.argument("pattern", StringArgumentType.greedyString())
 				.suggests((context, builder) -> {
 					String remaining = builder.getRemaining().toLowerCase(Locale.ROOT);
@@ -35,6 +40,7 @@ final class UnmuteCommand {
 					boolean removed = mutePatternManager.removePattern(pattern);
 					reply.accept(removed
 						? Messages.mutePatternRemoved(pattern)
+						// Code: MUTE-LOOKUP-001
 						: Messages.mutePatternNotFound(pattern));
 					return removed ? 1 : 0;
 				}));

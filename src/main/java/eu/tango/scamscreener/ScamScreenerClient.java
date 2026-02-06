@@ -9,8 +9,6 @@ import eu.tango.scamscreener.commands.ScamScreenerCommands;
 import eu.tango.scamscreener.config.DebugConfig;
 import eu.tango.scamscreener.config.LocalAiModelConfig;
 import eu.tango.scamscreener.chat.mute.MutePatternManager;
-import eu.tango.scamscreener.chat.party.PartyScanController;
-import eu.tango.scamscreener.chat.parser.PartyTabParser;
 import eu.tango.scamscreener.chat.parser.ChatLineParser;
 import eu.tango.scamscreener.chat.trigger.TriggerContext;
 import eu.tango.scamscreener.pipeline.model.DetectionOutcome;
@@ -20,16 +18,17 @@ import eu.tango.scamscreener.pipeline.core.MessageEventParser;
 import eu.tango.scamscreener.lookup.MojangProfileService;
 import eu.tango.scamscreener.lookup.PlayerLookup;
 import eu.tango.scamscreener.lookup.ResolvedTarget;
-import eu.tango.scamscreener.lookup.TabFooterAccessor;
 import eu.tango.scamscreener.rules.ScamRules;
 import eu.tango.scamscreener.ui.Messages;
 import eu.tango.scamscreener.ui.MessageFlagging;
 import eu.tango.scamscreener.ui.Keybinds;
 import eu.tango.scamscreener.ui.DebugMessages;
+import eu.tango.scamscreener.ui.DebugRegistry;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
+import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.gui.components.ChatComponent;
@@ -48,6 +47,9 @@ import org.slf4j.LoggerFactory;
 import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
+import java.nio.file.NoSuchFileException;
+import java.nio.file.Path;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -55,11 +57,11 @@ import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import eu.tango.scamscreener.security.EmailSafety;
 
 public class ScamScreenerClient implements ClientModInitializer {
 	private static final BlacklistManager BLACKLIST = new BlacklistManager();
 	private static final Logger LOGGER = LoggerFactory.getLogger(ScamScreenerClient.class);
-	private static final int PARTY_SCAN_INTERVAL_TICKS = 40;
 	private static final ScheduledExecutorService WARNING_SOUND_EXECUTOR = Executors.newSingleThreadScheduledExecutor(r -> {
 		Thread thread = new Thread(r, "scamscreener-warning-sound");
 		thread.setDaemon(true);
@@ -67,21 +69,19 @@ public class ScamScreenerClient implements ClientModInitializer {
 	});
 	private static final int LEGIT_LABEL = 0;
 	private static final int SCAM_LABEL = 1;
-
 	private final PlayerLookup playerLookup = new PlayerLookup();
 	private final MojangProfileService mojangProfileService = new MojangProfileService();
-	private final TabFooterAccessor tabFooterAccessor = new TabFooterAccessor();
 	private final TrainingDataService trainingDataService = new TrainingDataService();
 	private final LocalAiTrainer localAiTrainer = new LocalAiTrainer();
 	private final ModelUpdateService modelUpdateService = new ModelUpdateService();
 	private final MutePatternManager mutePatternManager = new MutePatternManager();
 	private final DetectionPipeline detectionPipeline = new DetectionPipeline(mutePatternManager, new LocalAiScorer());
-	private final PartyTabParser partyTabParser = new PartyTabParser();
-	private final PartyScanController partyScanController = new PartyScanController(PARTY_SCAN_INTERVAL_TICKS);
 	private final Set<UUID> currentlyDetected = new HashSet<>();
 	private final Set<String> warnedContexts = new HashSet<>();
+	private final EmailSafety emailSafety = new EmailSafety();
 	private DebugConfig debugConfig;
 	private boolean checkedModelUpdate;
+	private volatile boolean trainingInProgress;
 
 	@Override
 	public void onInitializeClient() {
@@ -106,6 +106,8 @@ public class ScamScreenerClient implements ClientModInitializer {
 			this::captureBulkLegit,
 			this::migrateTrainingData,
 			this::handleModelUpdateCommand,
+			this::handleModelUpdateCheck,
+			this::handleEmailBypass,
 			this::setAllDebug,
 			this::setDebugKey,
 			this::debugStateSnapshot,
@@ -123,17 +125,17 @@ public class ScamScreenerClient implements ClientModInitializer {
 		ClientReceiveMessageEvents.ALLOW_CHAT.register((message, signedMessage, sender, params, timestamp) -> handleChatAllow(message));
 		ClientReceiveMessageEvents.GAME.register((message, overlay) -> handleHypixelMessage(message));
 		ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, timestamp) -> handleHypixelMessage(message));
+		ClientSendMessageEvents.ALLOW_CHAT.register(this::handleOutgoingChat);
+		ClientSendMessageEvents.ALLOW_COMMAND.register(this::handleOutgoingCommand);
 	}
 
 	private void onClientTick(Minecraft client) {
 		updateHoveredFlagTarget(client);
 		handleFlagKeybinds(client);
-		partyScanController.onTick();
 		if (client.player == null || client.getConnection() == null) {
 			currentlyDetected.clear();
 			warnedContexts.clear();
 			detectionPipeline.reset();
-			partyScanController.reset();
 			checkedModelUpdate = false;
 			return;
 		}
@@ -147,10 +149,6 @@ public class ScamScreenerClient implements ClientModInitializer {
 		if (BLACKLIST.isEmpty()) {
 			currentlyDetected.clear();
 			return;
-		}
-
-		if (partyScanController.shouldScanPartyTab()) {
-			checkPartyTabAndWarn(client);
 		}
 
 		Team ownTeam = client.player.getTeam();
@@ -186,39 +184,9 @@ public class ScamScreenerClient implements ClientModInitializer {
 		currentlyDetected.addAll(detectedNow);
 	}
 
-	private void checkPartyTabAndWarn(Minecraft client) {
-		Component footer = tabFooterAccessor.readFooter(client);
-		if (footer == null) {
-			debugParty("party tab footer empty");
-			return;
-		}
-
-		for (String memberName : partyTabParser.extractPartyMembers(footer.getString())) {
-			UUID uuid = playerLookup.findUuidByName(memberName);
-			if (uuid == null || !BLACKLIST.contains(uuid)) {
-				debugParty("party member " + memberName + " not blacklisted");
-				continue;
-			}
-
-			String dedupeKey = "party-tab:" + uuid;
-			if (!warnedContexts.add(dedupeKey)) {
-				debugParty("party member " + memberName + " already warned");
-				continue;
-			}
-
-			debugParty("party member blacklisted: " + memberName);
-			sendBlacklistWarning(memberName, uuid, "listed in your party tab");
-		}
-	}
-
 	private void handleHypixelMessage(Component message) {
 		String plain = message.getString().trim();
 		trainingDataService.recordChatLine(plain);
-		String ownName = Minecraft.getInstance().player == null ? null : Minecraft.getInstance().player.getGameProfile().name();
-		if (partyScanController.updateStateFromMessage(plain, ownName)) {
-			debugParty("party scan state changed by message: " + plain);
-			clearPartyTabDedupe();
-		}
 
 		Minecraft client = Minecraft.getInstance();
 		if (client.player == null || client.getConnection() == null) {
@@ -250,7 +218,11 @@ public class ScamScreenerClient implements ClientModInitializer {
 			return true;
 		}
 
-		Component decorated = decorateChatMessage(message, parsed.message());
+		boolean blacklisted = isBlacklisted(parsed.playerName());
+		debugChatColor("line player=" + parsed.playerName() + " blacklisted=" + blacklisted);
+		Component decorated = blacklisted
+			? rebuildChatMessage(message, parsed)
+			: decorateChatMessage(message, parsed.message(), false);
 		Minecraft client = Minecraft.getInstance();
 		if (client != null) {
 			client.execute(() -> {
@@ -264,7 +236,7 @@ public class ScamScreenerClient implements ClientModInitializer {
 		return false;
 	}
 
-	private static Component decorateChatMessage(Component message, String rawMessage) {
+	private static Component decorateChatMessage(Component message, String rawMessage, boolean blacklisted) {
 		String safe = rawMessage == null ? "" : rawMessage.trim();
 		String id = MessageFlagging.registerMessage(safe);
 		MutableComponent hover = Component.literal("CTRL+Y = legit\nCTRL+N = scam").withStyle(ChatFormatting.YELLOW);
@@ -272,23 +244,126 @@ public class ScamScreenerClient implements ClientModInitializer {
 		Style extra = Style.EMPTY
 			.withHoverEvent(new HoverEvent.ShowText(hover))
 			.withClickEvent(new ClickEvent.CopyToClipboard(MessageFlagging.clickValue(id)));
-		applyStyleRecursive(wrapped, extra);
+		applyStyleRecursive(wrapped, extra, blacklisted ? safe : null, blacklisted ? ChatFormatting.RED : null);
 		return wrapped;
 	}
 
-	private static void applyStyleRecursive(MutableComponent component, Style extra) {
+	private static Component rebuildChatMessage(Component message, ChatLineParser.ParsedPlayerLine parsed) {
+		String safe = parsed == null || parsed.message() == null ? "" : parsed.message().trim();
+		String id = MessageFlagging.registerMessage(safe);
+		MutableComponent hover = Component.literal("CTRL+Y = legit\nCTRL+N = scam").withStyle(ChatFormatting.YELLOW);
+		Style clickStyle = Style.EMPTY
+			.withHoverEvent(new HoverEvent.ShowText(hover))
+			.withClickEvent(new ClickEvent.CopyToClipboard(MessageFlagging.clickValue(id)));
+
+		List<StyledSegment> segments = flattenSegments(message);
+		MutableComponent out = Component.empty();
+		boolean seenColon = false;
+		for (StyledSegment segment : segments) {
+			String text = segment.text();
+			if (text == null || text.isEmpty()) {
+				continue;
+			}
+			Style base = segment.style()
+				.withHoverEvent(clickStyle.getHoverEvent())
+				.withClickEvent(clickStyle.getClickEvent());
+
+			if (!seenColon) {
+				int colon = text.indexOf(':');
+				if (colon < 0) {
+					out.append(Component.literal(text).withStyle(base));
+					continue;
+				}
+				String before = text.substring(0, colon + 1);
+				out.append(Component.literal(before).withStyle(base));
+				String after = text.substring(colon + 1);
+				if (!after.isEmpty()) {
+					Style red = base.withColor(ChatFormatting.RED);
+					out.append(Component.literal(after).withStyle(red));
+				}
+				seenColon = true;
+				continue;
+			}
+
+			out.append(Component.literal(text).withStyle(base.withColor(ChatFormatting.RED)));
+		}
+		return out;
+	}
+
+	private static List<StyledSegment> flattenSegments(Component component) {
+		if (component == null) {
+			return List.of();
+		}
+		List<StyledSegment> segments = new java.util.ArrayList<>();
+		component.visit((style, text) -> {
+			if (text != null && !text.isEmpty()) {
+				segments.add(new StyledSegment(text, style));
+			}
+			return java.util.Optional.empty();
+		}, Style.EMPTY);
+		return segments;
+	}
+
+	private record StyledSegment(String text, Style style) {
+	}
+
+	private static void applyStyleRecursive(MutableComponent component, Style extra, String messageText, ChatFormatting defaultColor) {
 		if (component == null) {
 			return;
 		}
 		Style merged = component.getStyle()
 			.withHoverEvent(extra.getHoverEvent())
 			.withClickEvent(extra.getClickEvent());
+		if (defaultColor != null) {
+			if (shouldColorMessagePart(component, messageText)) {
+				merged = merged.withColor(defaultColor);
+			} else if (merged.getColor() == null) {
+				merged = merged.withColor(defaultColor);
+			}
+		}
 		component.setStyle(merged);
 		for (Component sibling : component.getSiblings()) {
 			if (sibling instanceof MutableComponent mutable) {
-				applyStyleRecursive(mutable, extra);
+				applyStyleRecursive(mutable, extra, messageText, defaultColor);
 			}
 		}
+	}
+
+	private static boolean shouldColorMessagePart(MutableComponent component, String messageText) {
+		if (messageText == null || messageText.isBlank()) {
+			return false;
+		}
+		if (!component.getSiblings().isEmpty()) {
+			return false;
+		}
+		String piece = component.getString();
+		if (piece == null || piece.isBlank()) {
+			return false;
+		}
+		String normalizedMessage = normalizeForMatch(messageText);
+		String normalizedPiece = normalizeForMatch(piece);
+		if (normalizedPiece.isBlank()) {
+			return false;
+		}
+		return normalizedMessage.contains(normalizedPiece);
+	}
+
+	private static String normalizeForMatch(String input) {
+		if (input == null) {
+			return "";
+		}
+		return input.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9]+", " ").trim();
+	}
+
+	private boolean isBlacklisted(String playerName) {
+		if (playerName == null || playerName.isBlank()) {
+			return false;
+		}
+		UUID uuid = playerLookup.findUuidByName(playerName);
+		if (uuid != null) {
+			return BLACKLIST.contains(uuid);
+		}
+		return BLACKLIST.findByName(playerName) != null;
 	}
 
 	private void updateHoveredFlagTarget(Minecraft client) {
@@ -352,14 +427,11 @@ public class ScamScreenerClient implements ClientModInitializer {
 			reply(Messages.trainingSampleFlagged(label == LEGIT_LABEL ? "legit" : "scam"));
 		} catch (IOException e) {
 			LOGGER.warn("Failed to save training sample from hover", e);
-			reply(Messages.trainingSamplesSaveFailed(e.getMessage()));
+			// Code: TR-SAVE-002
+			reply(Messages.trainingSamplesSaveFailed(trainingErrorDetail(e, trainingDataService.trainingDataPath())));
 		}
 	}
 
-
-	private void clearPartyTabDedupe() {
-		warnedContexts.removeIf(key -> key.startsWith("party-tab:"));
-	}
 
 	private void maybeNotifyBlockedMessages(Minecraft client) {
 		long now = System.currentTimeMillis();
@@ -391,7 +463,8 @@ public class ScamScreenerClient implements ClientModInitializer {
 			return 1;
 		} catch (IOException e) {
 			LOGGER.warn("Failed to save training samples", e);
-			reply(Messages.trainingSamplesSaveFailed(e.getMessage()));
+			// Code: TR-SAVE-002
+			reply(Messages.trainingSamplesSaveFailed(trainingErrorDetail(e, trainingDataService.trainingDataPath())));
 			return 0;
 		}
 	}
@@ -408,7 +481,8 @@ public class ScamScreenerClient implements ClientModInitializer {
 			return 1;
 		} catch (IOException e) {
 			LOGGER.warn("Failed to save training sample from message id", e);
-			reply(Messages.trainingSamplesSaveFailed(e.getMessage()));
+			// Code: TR-SAVE-002
+			reply(Messages.trainingSamplesSaveFailed(trainingErrorDetail(e, trainingDataService.trainingDataPath())));
 			return 0;
 		}
 	}
@@ -425,7 +499,8 @@ public class ScamScreenerClient implements ClientModInitializer {
 			return 1;
 		} catch (IOException e) {
 			LOGGER.warn("Failed to save bulk legit samples", e);
-			reply(Messages.trainingSamplesSaveFailed(e.getMessage()));
+			// Code: TR-SAVE-002
+			reply(Messages.trainingSamplesSaveFailed(trainingErrorDetail(e, trainingDataService.trainingDataPath())));
 			return 0;
 		}
 	}
@@ -456,45 +531,95 @@ public class ScamScreenerClient implements ClientModInitializer {
 		};
 	}
 
-	private boolean debugParty;
-	private boolean debugTrade;
-	private boolean debugMute;
+	private int handleModelUpdateCheck(boolean force) {
+		modelUpdateService.checkForUpdateAndDownloadAsync(ScamScreenerClient::reply, force);
+		return 1;
+	}
+
+	private int handleEmailBypass(String id) {
+		if (id == null || id.isBlank()) {
+			reply(Messages.emailBypassExpired());
+			return 0;
+		}
+		EmailSafety.Pending pending = emailSafety.takePending(id);
+		if (pending == null || pending.message() == null || pending.message().isBlank()) {
+			reply(Messages.emailBypassExpired());
+			return 0;
+		}
+		if (pending.command()) {
+			sendCommand(pending.message());
+		} else {
+			sendChatMessage(pending.message());
+		}
+		reply(Messages.emailBypassSent());
+		return 1;
+	}
+
+	private boolean handleOutgoingChat(String message) {
+		if (message == null || message.isBlank()) {
+			return true;
+		}
+		String id = emailSafety.blockIfEmail(message, false);
+		if (id == null) {
+			return true;
+		}
+		reply(Messages.emailSafetyBlocked(id));
+		return false;
+	}
+
+	private boolean handleOutgoingCommand(String command) {
+		if (command == null || command.isBlank()) {
+			return true;
+		}
+		String id = emailSafety.blockIfEmail(command, true);
+		if (id == null) {
+			return true;
+		}
+		reply(Messages.emailSafetyBlocked(id));
+		return false;
+	}
+
+	private static void sendChatMessage(String message) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null || client.getConnection() == null) {
+			return;
+		}
+		client.getConnection().sendChat(message);
+	}
+
+	private static void sendCommand(String command) {
+		Minecraft client = Minecraft.getInstance();
+		if (client.player == null || client.getConnection() == null) {
+			return;
+		}
+		client.getConnection().sendCommand(command);
+	}
+
 
 	private void setAllDebug(boolean enabled) {
 		modelUpdateService.setDebugEnabled(enabled);
-		debugParty = enabled;
-		debugTrade = enabled;
-		debugMute = enabled;
-		updateDebugConfig(enabled, enabled, enabled, enabled);
+		debugConfig.setAll(enabled);
+		updateDebugConfig();
 	}
 
 	private void setDebugKey(String key, boolean enabled) {
 		if (key == null) {
 			return;
 		}
-		String normalized = key.trim().toLowerCase(java.util.Locale.ROOT);
-		switch (normalized) {
-			case "updater" -> modelUpdateService.setDebugEnabled(enabled);
-			case "party" -> debugParty = enabled;
-			case "trade" -> debugTrade = enabled;
-			case "mute" -> debugMute = enabled;
-			default -> {
-			}
+		String normalized = DebugRegistry.normalize(key);
+		if (normalized.isBlank()) {
+			return;
 		}
-		updateDebugConfig(
-			modelUpdateService.isDebugEnabled(),
-			debugParty,
-			debugTrade,
-			debugMute
-		);
+		if ("updater".equals(normalized)) {
+			modelUpdateService.setDebugEnabled(enabled);
+		}
+		debugConfig.setEnabled(normalized, enabled);
+		updateDebugConfig();
 	}
 
 	private java.util.Map<String, Boolean> debugStateSnapshot() {
-		java.util.Map<String, Boolean> states = new java.util.LinkedHashMap<>();
+		java.util.Map<String, Boolean> states = debugConfig.snapshot();
 		states.put("updater", modelUpdateService.isDebugEnabled());
-		states.put("party", debugParty);
-		states.put("trade", debugTrade);
-		states.put("mute", debugMute);
 		return states;
 	}
 
@@ -503,20 +628,10 @@ public class ScamScreenerClient implements ClientModInitializer {
 		if (debugConfig == null) {
 			debugConfig = new DebugConfig();
 		}
-		modelUpdateService.setDebugEnabled(debugConfig.updater);
-		debugParty = debugConfig.party;
-		debugTrade = debugConfig.trade;
-		debugMute = debugConfig.mute;
+		modelUpdateService.setDebugEnabled(debugConfig.isEnabled("updater"));
 	}
 
-	private void updateDebugConfig(boolean updater, boolean party, boolean trade, boolean mute) {
-		if (debugConfig == null) {
-			debugConfig = new DebugConfig();
-		}
-		debugConfig.updater = updater;
-		debugConfig.party = party;
-		debugConfig.trade = trade;
-		debugConfig.mute = mute;
+	private void updateDebugConfig() {
 		DebugConfig.save(debugConfig);
 	}
 
@@ -531,26 +646,64 @@ public class ScamScreenerClient implements ClientModInitializer {
 			return 1;
 		} catch (IOException e) {
 			LOGGER.warn("Failed to migrate training data", e);
-			reply(Messages.trainingSamplesSaveFailed(e.getMessage()));
+			// Code: TR-SAVE-002
+			reply(Messages.trainingSamplesSaveFailed(trainingErrorDetail(e, trainingDataService.trainingDataPath())));
 			return 0;
 		}
 	}
 
 	private int trainLocalAiModel() {
-		try {
-			LocalAiTrainer.TrainingResult result = localAiTrainer.trainAndSave(trainingDataService.trainingDataPath());
-			ScamRules.reloadConfig();
-			reply(Messages.trainingCompleted(
-				result.sampleCount(),
-				result.positiveCount(),
-				result.archivedDataPath().getFileName().toString()
-			));
-			return 1;
-		} catch (IOException e) {
-			LOGGER.warn("Failed to train local AI model", e);
-			reply(Messages.trainingFailed(e.getMessage()));
+		if (trainingInProgress) {
+			reply(Messages.trainingAlreadyRunning());
 			return 0;
 		}
+		trainingInProgress = true;
+		Thread thread = new Thread(() -> {
+			try {
+				LocalAiTrainer.TrainingResult result = localAiTrainer.trainAndSave(trainingDataService.trainingDataPath());
+				ScamRules.reloadConfig();
+				reply(Messages.trainingCompleted(
+					result.sampleCount(),
+					result.positiveCount(),
+					result.archivedDataPath().getFileName().toString()
+				));
+				if (result.ignoredUnigrams() > 0) {
+					reply(Messages.trainingUnigramsIgnored(result.ignoredUnigrams()));
+				}
+			} catch (IOException e) {
+				LOGGER.warn("Failed to train local AI model", e);
+				// Code: TR-TRAIN-001
+				reply(Messages.trainingFailed(trainingErrorDetail(e, trainingDataService.trainingDataPath())));
+			} finally {
+				trainingInProgress = false;
+			}
+		}, "scamscreener-train");
+		thread.setDaemon(true);
+		thread.start();
+		return 1;
+	}
+
+	private static String trainingErrorDetail(IOException error, Path trainingPath) {
+		if (error == null) {
+			return "unknown error";
+		}
+		if (error instanceof NoSuchFileException missing) {
+			String file = missing.getFile();
+			return "Training data file not found: " + (file == null ? "unknown" : file);
+		}
+		if (error instanceof AccessDeniedException denied) {
+			String file = denied.getFile();
+			return "Access denied while reading training data: " + (file == null ? "unknown" : file);
+		}
+		String message = error.getMessage();
+		if (message == null || message.isBlank()) {
+			return error.getClass().getSimpleName();
+		}
+		String trimmed = message.trim();
+		if (trainingPath != null && trimmed.equals(trainingPath.toString())) {
+			return "Training data file not found: " + trimmed;
+		}
+		return trimmed;
 	}
 
 	private void autoAddFlaggedMessageToTrainingData(DetectionOutcome outcome) {
@@ -640,29 +793,29 @@ public class ScamScreenerClient implements ClientModInitializer {
 		sendBlacklistWarning(playerName, uuid, context.triggerReason());
 	}
 
-	private void debugParty(String message) {
-		if (!debugParty) {
-			return;
-		}
-		reply(DebugMessages.party(message));
-	}
-
 	private void debugTrade(String message) {
-		if (!debugTrade) {
+		if (!debugConfig.isEnabled("trade")) {
 			return;
 		}
-		reply(DebugMessages.trade(message));
+		reply(DebugMessages.debug("Trade", message));
 	}
 
 	private void debugMute(String message) {
-		if (!debugMute) {
+		if (!debugConfig.isEnabled("mute")) {
 			return;
 		}
-		reply(DebugMessages.mute(message));
+		reply(DebugMessages.debug("Mute", message));
+	}
+
+	private void debugChatColor(String message) {
+		if (!debugConfig.isEnabled("chatcolor")) {
+			return;
+		}
+		reply(DebugMessages.debug("ChatColor", message));
 	}
 
 	private void sendWarning(String playerName, UUID uuid) {
-		sendBlacklistWarning(playerName, uuid, "is in your team/party");
+		sendBlacklistWarning(playerName, uuid, "is in your team");
 	}
 
 	private void sendBlacklistWarning(String playerName, UUID uuid, String reason) {

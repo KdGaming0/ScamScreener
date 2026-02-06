@@ -21,11 +21,13 @@ import eu.tango.scamscreener.pipeline.stage.MuteStage;
 import eu.tango.scamscreener.pipeline.stage.OutputStage;
 import eu.tango.scamscreener.pipeline.stage.RuleSignalStage;
 import eu.tango.scamscreener.pipeline.stage.ScoringStage;
+import eu.tango.scamscreener.pipeline.stage.LevenshteinSignalStage;
 import eu.tango.scamscreener.pipeline.stage.TrendSignalStage;
 
 public final class DetectionPipeline {
 	private final MuteStage muteStage;
 	private final RuleSignalStage ruleSignalStage;
+	private final LevenshteinSignalStage levenshteinSignalStage;
 	private final BehaviorAnalyzer behaviorAnalyzer;
 	private final BehaviorSignalStage behaviorSignalStage;
 	private final AiSignalStage aiSignalStage;
@@ -43,6 +45,7 @@ public final class DetectionPipeline {
 		RuleConfig ruleConfig = new DefaultRuleConfig();
 		this.muteStage = new MuteStage(mutePatternManager);
 		this.ruleSignalStage = new RuleSignalStage(ruleConfig);
+		this.levenshteinSignalStage = new LevenshteinSignalStage(ruleConfig);
 		this.behaviorAnalyzer = new BehaviorAnalyzer(ruleConfig);
 		this.behaviorSignalStage = new BehaviorSignalStage(ruleConfig);
 		this.aiSignalStage = new AiSignalStage(new AiScorer(localAiScorer, ruleConfig));
@@ -56,7 +59,7 @@ public final class DetectionPipeline {
 	/**
 	 * Runs the pipeline for a single chat event. Stages are executed in this order:
 	 * {@link MuteStage} -> {@link BehaviorAnalyzer} -> {@link RuleSignalStage}
-	 * -> {@link BehaviorSignalStage} -> {@link AiSignalStage} -> {@link TrendSignalStage}
+	 * -> {@link LevenshteinSignalStage} -> {@link BehaviorSignalStage} -> {@link AiSignalStage} -> {@link TrendSignalStage}
 	 * -> {@link ScoringStage} -> {@link DecisionStage} -> {@link OutputStage}.
 	 */
 	public Optional<DetectionOutcome> process(MessageEvent event, Consumer<Component> reply, Runnable warningSound) {
@@ -69,6 +72,7 @@ public final class DetectionPipeline {
 		BehaviorAnalysis analysis = behaviorAnalyzer.analyze(safeEvent);
 		List<Signal> signals = new ArrayList<>();
 		signals.addAll(ruleSignalStage.collectSignals(safeEvent));
+		signals.addAll(levenshteinSignalStage.collectSignals(safeEvent));
 		signals.addAll(behaviorSignalStage.collectSignals(analysis));
 		signals.addAll(aiSignalStage.collectSignals(analysis));
 		signals.addAll(trendSignalStage.collectSignals(safeEvent, signals));

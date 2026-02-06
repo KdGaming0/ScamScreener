@@ -42,6 +42,7 @@ final class RuleCommand {
 					.executes(context -> {
 						ScamRules.ScamRule rule = parseRule(StringArgumentType.getString(context, "rule"));
 						if (rule == null) {
+							// Code: RULE-NAME-001
 							reply.accept(Messages.invalidRuleName());
 							return 0;
 						}
@@ -65,6 +66,7 @@ final class RuleCommand {
 					.executes(context -> {
 						ScamRules.ScamRule rule = parseRule(StringArgumentType.getString(context, "rule"));
 						if (rule == null) {
+							// Code: RULE-NAME-001
 							reply.accept(Messages.invalidRuleName());
 							return 0;
 						}

@@ -101,7 +101,14 @@ public final class TrainingDataService {
 		ensureLatestHeader();
 		StringBuilder rows = new StringBuilder();
 		for (String message : messages) {
+			if (shouldFilterMessage(message)) {
+				continue;
+			}
 			rows.append(buildTrainingCsvRow(message, label)).append(System.lineSeparator());
+		}
+
+		if (rows.length() == 0) {
+			return;
 		}
 
 		Files.writeString(
@@ -197,9 +204,86 @@ public final class TrainingDataService {
 		}
 		ChatLineParser.ParsedPlayerLine parsed = ChatLineParser.parsePlayerLine(raw);
 		if (parsed != null && parsed.message() != null && !parsed.message().isBlank()) {
-			return parsed.message().trim();
+			return normalizeText(parsed.message());
 		}
-		return raw.trim();
+		return normalizeText(raw);
+	}
+
+	private static String normalizeText(String text) {
+		if (text == null || text.isBlank()) {
+			return "";
+		}
+		String lowered = text.trim().toLowerCase(Locale.ROOT);
+		String cleaned = lowered.replaceAll("[^a-z0-9]+", " ");
+		return cleaned.trim();
+	}
+
+	private static boolean shouldFilterMessage(String raw) {
+		if (raw == null) {
+			return true;
+		}
+		String trimmed = raw.trim();
+		if (trimmed.isEmpty()) {
+			return true;
+		}
+		if (hasOnlyNonAlnum(trimmed)) {
+			return true;
+		}
+		if (hasRepeatedChars(trimmed, 3)) {
+			return true;
+		}
+		String normalized = normalizeTrainingMessage(trimmed);
+		if (normalized.isBlank()) {
+			return true;
+		}
+		return countAlnumTokens(normalized) <= 1;
+	}
+
+	private static boolean hasOnlyNonAlnum(String text) {
+		for (int i = 0; i < text.length(); i++) {
+			if (Character.isLetterOrDigit(text.charAt(i))) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	private static boolean hasRepeatedChars(String text, int runLength) {
+		if (runLength <= 1) {
+			return false;
+		}
+		char prev = 0;
+		int run = 0;
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (c == prev) {
+				run++;
+			} else {
+				prev = c;
+				run = 1;
+			}
+			if (run >= runLength) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	private static int countAlnumTokens(String text) {
+		int count = 0;
+		boolean inToken = false;
+		for (int i = 0; i < text.length(); i++) {
+			char c = text.charAt(i);
+			if (Character.isLetterOrDigit(c)) {
+				if (!inToken) {
+					count++;
+					inToken = true;
+				}
+			} else {
+				inToken = false;
+			}
+		}
+		return count;
 	}
 
 	private static String escapeCsv(String value) {

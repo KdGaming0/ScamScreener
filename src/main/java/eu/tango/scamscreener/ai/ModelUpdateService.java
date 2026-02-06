@@ -19,7 +19,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
@@ -41,7 +43,14 @@ public final class ModelUpdateService {
 
 	public void checkForUpdateAsync(Consumer<Component> reply) {
 		debug(reply, "check started");
-		Thread thread = new Thread(() -> checkForUpdate(reply), "scamscreener-model-check");
+		Thread thread = new Thread(() -> checkForUpdate(reply, false, false), "scamscreener-model-check");
+		thread.setDaemon(true);
+		thread.start();
+	}
+
+	public void checkForUpdateAndDownloadAsync(Consumer<Component> reply, boolean force) {
+		debug(reply, "check started (command)");
+		Thread thread = new Thread(() -> checkForUpdate(reply, force, true), "scamscreener-model-check");
 		thread.setDaemon(true);
 		thread.start();
 	}
@@ -57,6 +66,7 @@ public final class ModelUpdateService {
 	public int download(String id, Consumer<Component> reply) {
 		PendingModel pendingModel = pending.get(id);
 		if (pendingModel == null || pendingModel.info() == null) {
+			// Code: MU-LOOKUP-001
 			reply.accept(Messages.modelUpdateNotFound());
 			return 0;
 		}
@@ -70,6 +80,7 @@ public final class ModelUpdateService {
 	public int accept(String id, Consumer<Component> reply) {
 		PendingModel pendingModel = pending.get(id);
 		if (pendingModel == null || pendingModel.content() == null) {
+			// Code: MU-DOWNLOAD-001
 			reply.accept(Messages.modelUpdateNotReady());
 			return 0;
 		}
@@ -83,7 +94,8 @@ public final class ModelUpdateService {
 			return 1;
 		} catch (IOException e) {
 			debug(reply, "accept failed: " + e.getMessage());
-			reply.accept(Messages.modelUpdateFailed(e.getMessage()));
+			// Code: MU-UPDATE-001
+			reply.accept(Messages.modelUpdateFailed(modelUpdateErrorDetail(e)));
 			return 0;
 		}
 	}
@@ -91,6 +103,7 @@ public final class ModelUpdateService {
 	public int merge(String id, Consumer<Component> reply) {
 		PendingModel pendingModel = pending.get(id);
 		if (pendingModel == null || pendingModel.content() == null) {
+			// Code: MU-DOWNLOAD-001
 			reply.accept(Messages.modelUpdateNotReady());
 			return 0;
 		}
@@ -99,6 +112,7 @@ public final class ModelUpdateService {
 			LocalAiModelConfig local = LocalAiModelConfig.loadOrCreate();
 			LocalAiModelConfig incoming = GSON.fromJson(pendingModel.content(), LocalAiModelConfig.class);
 			if (incoming == null) {
+				// Code: MU-UPDATE-001
 				reply.accept(Messages.modelUpdateFailed("invalid model payload"));
 				return 0;
 			}
@@ -118,7 +132,8 @@ public final class ModelUpdateService {
 			return 1;
 		} catch (Exception e) {
 			debug(reply, "merge failed: " + e.getMessage());
-			reply.accept(Messages.modelUpdateFailed(e.getMessage()));
+			// Code: MU-UPDATE-001
+			reply.accept(Messages.modelUpdateFailed(modelUpdateErrorDetail(e)));
 			return 0;
 		}
 	}
@@ -129,29 +144,42 @@ public final class ModelUpdateService {
 			debug(reply, "ignored id=" + id);
 			return 1;
 		}
+		// Code: MU-LOOKUP-001
 		reply.accept(Messages.modelUpdateNotFound());
 		return 0;
 	}
 
-	private void checkForUpdate(Consumer<Component> reply) {
-		ModelVersionInfo info = fetchVersionInfo();
+	private void checkForUpdate(Consumer<Component> reply, boolean force, boolean autoDownload) {
+		FetchResult fetch = fetchVersionInfo();
+		ModelVersionInfo info = fetch.info();
 		if (info == null) {
 			debug(reply, "version info not found");
+			// Code: MU-CHECK-001
+			reply.accept(Messages.modelUpdateCheckFailed(fetch.error()));
+			return;
 		}
-		if (info == null || info.url == null || info.url.isBlank()) {
+		if (info.url == null || info.url.isBlank()) {
+			// Code: MU-CHECK-001
+			reply.accept(Messages.modelUpdateCheckFailed("missing update url"));
 			return;
 		}
 		String localHash = hashLocalModel();
 		debug(reply, "local hash=" + (localHash == null ? "none" : localHash));
 		debug(reply, "remote sha256=" + (info.sha256 == null ? "none" : info.sha256));
-		if (localHash != null && info.sha256 != null && !info.sha256.isBlank()
+		if (!force && localHash != null && info.sha256 != null && !info.sha256.isBlank()
 			&& localHash.equalsIgnoreCase(info.sha256.trim())) {
 			debug(reply, "no update (hash match)");
+			reply.accept(Messages.modelUpdateUpToDate());
 			return;
 		}
 
 		String id = UUID.randomUUID().toString().replace("-", "");
 		pending.put(id, new PendingModel(info, null));
+		if (autoDownload) {
+			debug(reply, "update available id=" + id + " (auto-download)");
+			downloadModel(id, pending.get(id), reply);
+			return;
+		}
 		String localVersion = String.valueOf(LocalAiModelConfig.loadOrCreate().version);
 		reply.accept(Messages.modelUpdateAvailable(Messages.modelUpdateDownloadLink(
 			"/scamscreener ai model download " + id,
@@ -165,6 +193,7 @@ public final class ModelUpdateService {
 		String payload = fetchText(pendingModel.info().url);
 		if (payload == null || payload.isBlank()) {
 			debug(reply, "download failed (empty)");
+			// Code: MU-UPDATE-001
 			reply.accept(Messages.modelUpdateFailed("download failed"));
 			return;
 		}
@@ -172,6 +201,7 @@ public final class ModelUpdateService {
 			String hash = sha256(payload.getBytes(StandardCharsets.UTF_8));
 			if (hash != null && !hash.equalsIgnoreCase(pendingModel.info().sha256.trim())) {
 				debug(reply, "sha256 mismatch");
+				// Code: MU-UPDATE-001
 				reply.accept(Messages.modelUpdateFailed("sha256 mismatch"));
 				return;
 			}
@@ -208,6 +238,30 @@ public final class ModelUpdateService {
 		return target;
 	}
 
+	private static String modelUpdateErrorDetail(Exception error) {
+		if (error == null) {
+			return "unknown error";
+		}
+		if (error instanceof NoSuchFileException missing) {
+			String file = missing.getFile();
+			return "Model file not found: " + (file == null ? "unknown" : file);
+		}
+		if (error instanceof AccessDeniedException denied) {
+			String file = denied.getFile();
+			return "Access denied while updating model: " + (file == null ? "unknown" : file);
+		}
+		String message = error.getMessage();
+		if (message == null || message.isBlank()) {
+			return error.getClass().getSimpleName();
+		}
+		String trimmed = message.trim();
+		Path modelPath = LocalAiModelConfig.filePath();
+		if (modelPath != null && trimmed.equals(modelPath.toString())) {
+			return "Model file not found: " + trimmed;
+		}
+		return trimmed;
+	}
+
 	private static String hashLocalModel() {
 		try {
 			if (!Files.exists(LocalAiModelConfig.filePath())) {
@@ -234,15 +288,15 @@ public final class ModelUpdateService {
 		}
 	}
 
-	private static ModelVersionInfo fetchVersionInfo() {
+	private static FetchResult fetchVersionInfo() {
 		String payload = fetchText(VERSION_URL);
 		if (payload == null || payload.isBlank()) {
-			return null;
+			return new FetchResult(null, "empty response");
 		}
 		try {
-			return GSON.fromJson(payload, ModelVersionInfo.class);
-		} catch (Exception ignored) {
-			return null;
+			return new FetchResult(GSON.fromJson(payload, ModelVersionInfo.class), null);
+		} catch (Exception e) {
+			return new FetchResult(null, e.getMessage());
 		}
 	}
 
@@ -294,6 +348,9 @@ public final class ModelUpdateService {
 	}
 
 	private record ModelVersionInfo(String version, String sha256, String url) {
+	}
+
+	private record FetchResult(ModelVersionInfo info, String error) {
 	}
 
 	private record PendingModel(ModelVersionInfo info, String content) {

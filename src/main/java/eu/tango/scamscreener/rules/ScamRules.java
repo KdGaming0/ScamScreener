@@ -2,6 +2,7 @@ package eu.tango.scamscreener.rules;
 
 import eu.tango.scamscreener.ai.LocalAiScorer;
 import eu.tango.scamscreener.config.ScamRulesConfig;
+import lombok.experimental.UtilityClass;
 
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -14,12 +15,10 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
-public final class ScamRules {
+@UtilityClass
+public class ScamRules {
 	private static final LocalAiScorer LOCAL_AI_SCORER = new LocalAiScorer();
 	private static RuntimeConfig config = RuntimeConfig.from(ScamRulesConfig.loadOrCreate());
-
-	private ScamRules() {
-	}
 
 	public static void reloadConfig() {
 		config = RuntimeConfig.from(ScamRulesConfig.loadOrCreate());
@@ -52,6 +51,50 @@ public final class ScamRules {
 
 	public static String autoCaptureAlertLevelSetting() {
 		return config.autoCaptureAlertLevelSetting();
+	}
+
+	public static int levelMediumThreshold() {
+		return config.levelMediumThreshold();
+	}
+
+	public static int levelHighThreshold() {
+		return config.levelHighThreshold();
+	}
+
+	public static int levelCriticalThreshold() {
+		return config.levelCriticalThreshold();
+	}
+
+	public static double similarityRuleThreshold() {
+		return config.similarityRuleThreshold();
+	}
+
+	public static double similarityTrainingThreshold() {
+		return config.similarityTrainingThreshold();
+	}
+
+	public static double similarityTrainingMargin() {
+		return config.similarityTrainingMargin();
+	}
+
+	public static int similarityRuleWeight() {
+		return config.similarityRuleWeight();
+	}
+
+	public static int similarityTrainingWeight() {
+		return config.similarityTrainingWeight();
+	}
+
+	public static int similarityMaxTrainingSamples() {
+		return config.similarityMaxTrainingSamples();
+	}
+
+	public static int similarityMaxCompareLength() {
+		return config.similarityMaxCompareLength();
+	}
+
+	public static int similarityMinMessageLength() {
+		return config.similarityMinMessageLength();
 	}
 
 	public static ScamRiskLevel setMinimumAlertRiskLevel(ScamRiskLevel level) {
@@ -149,11 +192,13 @@ public final class ScamRules {
 		UPFRONT_PAYMENT,
 		ACCOUNT_DATA_REQUEST,
 		EXTERNAL_PLATFORM_PUSH,
+		DISCORD_HANDLE,
 		FAKE_MIDDLEMAN_CLAIM,
 		TOO_GOOD_TO_BE_TRUE,
 		TRUST_MANIPULATION,
 		SPAMMY_CONTACT_PATTERN,
 		MULTI_MESSAGE_PATTERN,
+		SIMILARITY_MATCH,
 		LOCAL_AI_RISK_SIGNAL
 	}
 
@@ -245,6 +290,17 @@ public final class ScamRules {
 		double localAiTriggerProbability,
 		ScamRiskLevel minimumAlertRiskLevel,
 		AutoCaptureAlertLevel autoCaptureAlertLevel,
+		int levelMediumThreshold,
+		int levelHighThreshold,
+		int levelCriticalThreshold,
+		double similarityRuleThreshold,
+		double similarityTrainingThreshold,
+		double similarityTrainingMargin,
+		int similarityRuleWeight,
+		int similarityTrainingWeight,
+		int similarityMaxTrainingSamples,
+		int similarityMaxCompareLength,
+		int similarityMinMessageLength,
 		Set<ScamRule> disabledRules
 	) {
 		private boolean isEnabled(ScamRule rule) {
@@ -264,6 +320,17 @@ public final class ScamRules {
 				config.localAiTriggerProbability,
 				parseRiskLevelOrDefault(config.minAlertRiskLevel, ScamRiskLevel.HIGH),
 				AutoCaptureAlertLevel.parseOrDefault(config.autoCaptureAlertLevel, AutoCaptureAlertLevel.OFF),
+				config.levelMedium,
+				config.levelHigh,
+				config.levelCritical,
+				config.similarityRuleThreshold,
+				config.similarityTrainingThreshold,
+				config.similarityTrainingMargin,
+				config.similarityRuleWeight,
+				config.similarityTrainingWeight,
+				config.similarityMaxTrainingSamples,
+				config.similarityMaxCompareLength,
+				config.similarityMinMessageLength,
 				parseDisabledRules(config.disabledRules)
 			);
 		}

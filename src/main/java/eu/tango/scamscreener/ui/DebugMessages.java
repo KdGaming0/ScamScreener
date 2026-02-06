@@ -20,12 +20,12 @@ public final class DebugMessages {
 	private DebugMessages() {
 	}
 
-	public static MutableComponent updater(String message) {
-		return labeled("Updater", message);
+	public static MutableComponent debug(String label, String message) {
+		return labeled(label, message);
 	}
 
-	public static MutableComponent party(String message) {
-		return labeled("Party", message);
+	public static MutableComponent updater(String message) {
+		return labeled("Updater", message);
 	}
 
 	public static MutableComponent trade(String message) {
@@ -34,6 +34,10 @@ public final class DebugMessages {
 
 	public static MutableComponent mute(String message) {
 		return labeled("Mute", message);
+	}
+
+	public static MutableComponent chatColor(String message) {
+		return labeled("ChatColor", message);
 	}
 
 	public static MutableComponent debugStatus(String status) {
@@ -57,7 +61,7 @@ public final class DebugMessages {
 			first = false;
 			String key = entry.getKey();
 			boolean enabled = Boolean.TRUE.equals(entry.getValue());
-			String label = key + "=" + (enabled ? "on" : "off");
+			String label = key;
 			String command = "/scamscreener debug " + (!enabled) + " " + key;
 			Style style = Style.EMPTY
 				.withColor(enabled ? ACTIVE_COLOR : MESSAGE_COLOR)

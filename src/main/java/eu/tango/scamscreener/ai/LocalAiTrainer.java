@@ -26,8 +26,8 @@ public final class LocalAiTrainer {
 	private static final String[] PLATFORM_WORDS = {"discord", "telegram", "t.me", "server", "dm"};
 
 	private static final int BASE_FEATURE_COUNT = 17;
-	private static final int MAX_VOCAB_SIZE = 200;
-	private static final int MIN_TOKEN_COUNT = 2;
+	private static final int MAX_VOCAB_SIZE = 2500;
+	private static final int MIN_TOKEN_COUNT = 3;
 	private static final int ITERATIONS = 1200;
 	private static final double LEARNING_RATE = 0.22;
 	private static final double L2 = 0.01;
@@ -38,7 +38,8 @@ public final class LocalAiTrainer {
 	private static final String OLD_MODELS_DIR_NAME = "models";
 
 	public TrainingResult trainAndSave(Path csvPath) throws IOException {
-		List<Sample> samples = loadAllSamples(csvPath);
+		int[] ignoredUnigrams = new int[] {0};
+		List<Sample> samples = loadAllSamples(csvPath, ignoredUnigrams);
 		validateSamples(samples);
 
 		List<String> vocab = TokenFeatureExtractor.buildVocab(samples, MAX_VOCAB_SIZE, MIN_TOKEN_COUNT);
@@ -102,7 +103,7 @@ public final class LocalAiTrainer {
 		Path archivedPath = archiveTrainingData(csvPath);
 
 		long positive = samples.stream().filter(s -> s.label() == 1).count();
-		return new TrainingResult(samples.size(), (int) positive, archivedPath);
+		return new TrainingResult(samples.size(), (int) positive, archivedPath, ignoredUnigrams[0]);
 	}
 
 	private static double[] buildFeatures(Sample sample, List<String> vocab) {
@@ -145,7 +146,7 @@ public final class LocalAiTrainer {
 		return Files.move(csvPath, target);
 	}
 
-	private static List<Sample> loadAllSamples(Path csvPath) throws IOException {
+	private static List<Sample> loadAllSamples(Path csvPath, int[] ignoredUnigrams) throws IOException {
 		List<Path> sources = new ArrayList<>();
 		if (Files.exists(csvPath)) {
 			sources.add(csvPath);
@@ -158,7 +159,7 @@ public final class LocalAiTrainer {
 
 		List<Sample> allSamples = new ArrayList<>();
 		for (Path source : sources) {
-			allSamples.addAll(loadSamples(source));
+			allSamples.addAll(loadSamples(source, ignoredUnigrams));
 		}
 		return allSamples;
 	}
@@ -230,7 +231,7 @@ public final class LocalAiTrainer {
 		return target;
 	}
 
-	private static List<Sample> loadSamples(Path csvPath) throws IOException {
+	private static List<Sample> loadSamples(Path csvPath, int[] ignoredUnigrams) throws IOException {
 		if (!Files.exists(csvPath)) {
 			throw new IOException("Training file not found: " + csvPath);
 		}
@@ -252,8 +253,14 @@ public final class LocalAiTrainer {
 				continue;
 			}
 
-			String message = extractTrainingMessage(cols.get(0));
+			String message = normalizeTrainingMessage(extractTrainingMessage(cols.get(0)));
 			if (message.isBlank()) {
+				continue;
+			}
+			if (countTokens(message) <= 1) {
+				if (ignoredUnigrams != null && ignoredUnigrams.length > 0) {
+					ignoredUnigrams[0]++;
+				}
 				continue;
 			}
 			int label = parseInt(cols.get(1), -1);
@@ -277,6 +284,26 @@ public final class LocalAiTrainer {
 			));
 		}
 		return samples;
+	}
+
+	private static String normalizeTrainingMessage(String raw) {
+		if (raw == null || raw.isBlank()) {
+			return "";
+		}
+		String trimmed = raw.trim().toLowerCase(Locale.ROOT);
+		String cleaned = trimmed.replaceAll("[^a-z0-9]+", " ").replaceAll("\\s+", " ");
+		return cleaned.trim();
+	}
+
+	private static int countTokens(String text) {
+		int count = 0;
+		for (String token : TokenFeatureExtractor.wordSequence(text)) {
+			count++;
+			if (count > 1) {
+				return count;
+			}
+		}
+		return count;
 	}
 
 	private static String extractTrainingMessage(String raw) {
@@ -396,6 +423,6 @@ public final class LocalAiTrainer {
 	) {
 	}
 
-	public record TrainingResult(int sampleCount, int positiveCount, Path archivedDataPath) {
+	public record TrainingResult(int sampleCount, int positiveCount, Path archivedDataPath, int ignoredUnigrams) {
 	}
 }

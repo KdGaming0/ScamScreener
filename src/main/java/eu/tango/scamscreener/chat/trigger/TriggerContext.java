@@ -19,11 +19,6 @@ public enum TriggerContext {
 		"trade-session",
 		"active trade session",
 		Pattern.compile("^You are trading with ([A-Za-z0-9_]{3,16})\\.?$")
-	),
-	PARTY_FINDER_JOIN(
-		"party-finder-join",
-		"joined your party finder group",
-		Pattern.compile("^Party Finder > ([A-Za-z0-9_]{3,16}) joined the dungeon group!.*$")
 	);
 
 	private final String dedupePrefix;

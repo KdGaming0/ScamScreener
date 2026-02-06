@@ -8,13 +8,13 @@ public final class DetectionScoring {
 	}
 
 	public static DetectionLevel mapLevel(double score) {
-		if (score >= 70) {
+		if (score >= ScamRules.levelCriticalThreshold()) {
 			return DetectionLevel.CRITICAL;
 		}
-		if (score >= 40) {
+		if (score >= ScamRules.levelHighThreshold()) {
 			return DetectionLevel.HIGH;
 		}
-		if (score >= 20) {
+		if (score >= ScamRules.levelMediumThreshold()) {
 			return DetectionLevel.MEDIUM;
 		}
 		return DetectionLevel.LOW;

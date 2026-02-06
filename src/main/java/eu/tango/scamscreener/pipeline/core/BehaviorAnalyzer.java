@@ -11,6 +11,8 @@ public final class BehaviorAnalyzer {
 	private String lastPlayerKey;
 	private int consecutiveCount;
 	private final java.util.List<String> consecutiveMessages = new java.util.ArrayList<>();
+	private static final java.util.regex.Pattern DISCORD_HANDLE_PATTERN = java.util.regex.Pattern.compile("@[a-z0-9._-]{2,32}");
+	private static final java.util.regex.Pattern DISCORD_WORD_PATTERN = java.util.regex.Pattern.compile("\\bdiscord\\b");
 
 	/**
 	 * Extracts behavior flags from each chat line (e.g. external platform push).
@@ -56,10 +58,12 @@ public final class BehaviorAnalyzer {
 		lastPlayerKey = playerKey;
 
 		ScamRules.BehaviorPatternSet patterns = ruleConfig.behaviorPatterns();
+		boolean hasDiscordHandle = DISCORD_WORD_PATTERN.matcher(normalized).find()
+			&& DISCORD_HANDLE_PATTERN.matcher(normalized).find();
 		return new BehaviorAnalysis(
 			event.rawMessage(),
 			normalized,
-			matches(patterns.externalPlatform(), normalized),
+			matches(patterns.externalPlatform(), normalized) && !hasDiscordHandle,
 			matches(patterns.upfrontPayment(), normalized),
 			matches(patterns.accountData(), normalized),
 			matches(patterns.middlemanClaim(), normalized),

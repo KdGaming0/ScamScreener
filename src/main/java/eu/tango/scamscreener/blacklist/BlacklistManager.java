@@ -69,6 +69,21 @@ public final class BlacklistManager {
 		return true;
 	}
 
+	public boolean update(UUID uuid, String name, int score, String reason) {
+		if (uuid == null) {
+			return false;
+		}
+		ScamEntry entry = entries.get(uuid);
+		if (entry == null) {
+			return false;
+		}
+		entry.name = safeName(name);
+		entry.score = clampScore(score);
+		entry.reason = safeReason(reason);
+		save();
+		return true;
+	}
+
 	public boolean remove(UUID uuid) {
 		if (uuid == null) {
 			return false;

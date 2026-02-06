@@ -20,7 +20,8 @@ final class MuteCommand {
 	) {
 		return ClientCommandManager.literal("mute")
 			.executes(context -> {
-				reply.accept(Messages.mutePatternList(mutePatternManager.allPatterns()));
+				mutePatternManager.setEnabled(true);
+				reply.accept(Messages.muteEnabled());
 				return 1;
 			})
 			.then(ClientCommandManager.argument("pattern", StringArgumentType.greedyString())
@@ -35,6 +36,7 @@ final class MuteCommand {
 						reply.accept(Messages.mutePatternAlreadyExists(pattern));
 						return 0;
 					}
+					// Code: MUTE-REGEX-001
 					reply.accept(Messages.mutePatternInvalid(pattern));
 					return 0;
 				}));

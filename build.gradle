@@ -27,6 +27,11 @@ dependencies {
 	// Fabric API. This is technically optional, but you probably want it anyway.
 	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 
+	compileOnly "org.projectlombok:lombok:1.18.36"
+	annotationProcessor "org.projectlombok:lombok:1.18.36"
+	testCompileOnly "org.projectlombok:lombok:1.18.36"
+	testAnnotationProcessor "org.projectlombok:lombok:1.18.36"
+
 	testImplementation "org.junit.jupiter:junit-jupiter:5.10.2"
 	
 }

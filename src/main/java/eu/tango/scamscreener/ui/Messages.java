@@ -4,6 +4,7 @@ import eu.tango.scamscreener.blacklist.BlacklistManager;
 import eu.tango.scamscreener.pipeline.model.DetectionResult;
 import eu.tango.scamscreener.pipeline.core.DetectionScoring;
 import eu.tango.scamscreener.rules.ScamRules;
+import eu.tango.scamscreener.ui.ErrorMessages;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.ChatFormatting;
@@ -61,6 +62,19 @@ public final class Messages {
 			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
 			.append(Component.literal(name).withStyle(ChatFormatting.AQUA))
 			.append(Component.literal(" was added with metadata.").withStyle(ChatFormatting.GRAY));
+	}
+
+	public static MutableComponent updatedBlacklistEntry(String name, int score, String reason) {
+		String safeName = name == null ? "unknown" : name;
+		String safeReason = reason == null ? "n/a" : reason;
+		return Component.literal(PREFIX)
+			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+			.append(Component.literal("Updated blacklist entry: ").withStyle(ChatFormatting.GRAY))
+			.append(Component.literal(safeName).withStyle(ChatFormatting.AQUA))
+			.append(Component.literal(" | ").withStyle(ChatFormatting.DARK_GRAY))
+			.append(Component.literal(String.valueOf(Math.max(0, score))).withStyle(ChatFormatting.DARK_RED))
+			.append(Component.literal(" | ").withStyle(ChatFormatting.DARK_GRAY))
+			.append(Component.literal(safeReason).withStyle(ChatFormatting.YELLOW));
 	}
 
 	public static MutableComponent alreadyBlacklisted(String name, UUID uuid) {
@@ -163,17 +177,23 @@ public final class Messages {
 	}
 
 	public static MutableComponent trainingSaveFailed(String errorMessage) {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Failed to save training sample: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(errorMessage == null ? "unknown error" : errorMessage).withStyle(ChatFormatting.YELLOW));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Failed to save training sample.",
+			"TR-SAVE-001",
+			errorMessage
+		);
 	}
 
 	public static MutableComponent trainingSamplesSaveFailed(String errorMessage) {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Failed to save training samples: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(errorMessage == null ? "unknown error" : errorMessage).withStyle(ChatFormatting.YELLOW));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Failed to save training samples.",
+			"TR-SAVE-002",
+			errorMessage
+		);
 	}
 
 	public static MutableComponent trainingDataMigrated(int updatedRows) {
@@ -194,6 +214,22 @@ public final class Messages {
 		return Component.literal(PREFIX)
 			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
 			.append(link == null ? Component.literal("Model update available.").withStyle(ChatFormatting.GRAY) : link);
+	}
+
+	public static MutableComponent modelUpdateUpToDate() {
+		return Component.literal(PREFIX)
+			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+			.append(Component.literal("AI model is already up to date.").withStyle(ChatFormatting.GRAY));
+	}
+
+	public static MutableComponent modelUpdateCheckFailed(String errorMessage) {
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Model update check failed.",
+			"MU-CHECK-001",
+			errorMessage
+		);
 	}
 
 	public static MutableComponent modelUpdateDownloadLink(String command, String localVersion, String remoteVersion) {
@@ -226,22 +262,33 @@ public final class Messages {
 	}
 
 	public static MutableComponent modelUpdateFailed(String message) {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Model update failed: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(message == null ? "unknown error" : message).withStyle(ChatFormatting.YELLOW));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Model update failed.",
+			"MU-UPDATE-001",
+			message
+		);
 	}
 
 	public static MutableComponent modelUpdateNotReady() {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Model update not downloaded yet.").withStyle(ChatFormatting.GRAY));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Model update not downloaded yet.",
+			"MU-DOWNLOAD-001",
+			"missing downloaded payload"
+		);
 	}
 
 	public static MutableComponent modelUpdateNotFound() {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Model update not found.").withStyle(ChatFormatting.GRAY));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Model update not found.",
+			"MU-LOOKUP-001",
+			"unknown update id"
+		);
 	}
 
 	public static MutableComponent modelUpdateIgnored() {
@@ -263,14 +310,29 @@ public final class Messages {
 			.append(Component.literal(".").withStyle(ChatFormatting.GRAY));
 	}
 
-	public static MutableComponent trainingFailed(String errorMessage) {
-		String safe = errorMessage == null ? "unknown error" : errorMessage;
+	public static MutableComponent trainingUnigramsIgnored(int count) {
+		int safe = Math.max(0, count);
 		return Component.literal(PREFIX)
 			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Training failed. ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal("[details]").withStyle(style -> style
-				.withColor(ChatFormatting.YELLOW)
-				.withHoverEvent(new HoverEvent.ShowText(Component.literal(safe).withStyle(ChatFormatting.GRAY)))));
+			.append(Component.literal("Ignored ").withStyle(ChatFormatting.GRAY))
+			.append(Component.literal(String.valueOf(safe)).withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD))
+			.append(Component.literal(" unigram training messages.").withStyle(ChatFormatting.GRAY));
+	}
+
+	public static MutableComponent trainingAlreadyRunning() {
+		return Component.literal(PREFIX)
+			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+			.append(Component.literal("Training is already running.").withStyle(ChatFormatting.GRAY));
+	}
+
+	public static MutableComponent trainingFailed(String errorMessage) {
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Training failed.",
+			"TR-TRAIN-001",
+			errorMessage
+		);
 	}
 
 	public static MutableComponent mojangLookupStarted(String input) {
@@ -320,6 +382,43 @@ public final class Messages {
 			.append(Component.literal(joined).withStyle(ChatFormatting.YELLOW));
 	}
 
+	public static MutableComponent muteEnabled() {
+		return Component.literal(PREFIX)
+			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+			.append(Component.literal("Mute filter enabled.").withStyle(ChatFormatting.GRAY));
+	}
+
+	public static MutableComponent muteDisabled() {
+		return Component.literal(PREFIX)
+			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+			.append(Component.literal("Mute filter disabled.").withStyle(ChatFormatting.GRAY));
+	}
+
+	public static MutableComponent emailSafetyBlocked(String bypassId) {
+		String id = bypassId == null ? "" : bypassId;
+		MutableComponent line = Component.literal(PREFIX)
+			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+			.append(Component.literal("Email address detected. This could be a scam. ").withStyle(ChatFormatting.GRAY));
+		Style bypassStyle = Style.EMPTY
+			.withColor(ChatFormatting.DARK_RED)
+			.withHoverEvent(new HoverEvent.ShowText(Component.literal("Send anyway").withStyle(ChatFormatting.YELLOW)))
+			.withClickEvent(new ClickEvent.RunCommand("/scamscreener bypass " + id));
+		line.append(Component.literal("[BYPASS]").setStyle(bypassStyle));
+		return line;
+	}
+
+	public static MutableComponent emailBypassSent() {
+		return Component.literal(PREFIX)
+			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+			.append(Component.literal("Bypass sent.").withStyle(ChatFormatting.GRAY));
+	}
+
+	public static MutableComponent emailBypassExpired() {
+		return Component.literal(PREFIX)
+			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+			.append(Component.literal("Bypass expired. Please resend the message.").withStyle(ChatFormatting.GRAY));
+	}
+
 	public static MutableComponent mutePatternAdded(String pattern) {
 		return Component.literal(PREFIX)
 			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
@@ -335,10 +434,13 @@ public final class Messages {
 	}
 
 	public static MutableComponent mutePatternInvalid(String pattern) {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Invalid regex pattern: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(pattern == null ? "" : pattern).withStyle(ChatFormatting.YELLOW));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Invalid regex pattern.",
+			"MUTE-REGEX-001",
+			pattern
+		);
 	}
 
 	public static MutableComponent mutePatternRemoved(String pattern) {
@@ -349,10 +451,13 @@ public final class Messages {
 	}
 
 	public static MutableComponent mutePatternNotFound(String pattern) {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Pattern not found: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(pattern == null ? "" : pattern).withStyle(ChatFormatting.YELLOW));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Pattern not found.",
+			"MUTE-LOOKUP-001",
+			pattern
+		);
 	}
 
 	public static MutableComponent blockedMessagesSummary(int blockedCount, int intervalSeconds) {
@@ -429,9 +534,13 @@ public final class Messages {
 	}
 
 	public static MutableComponent invalidRuleName() {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Invalid rule name. Use autocomplete or /scamscreener rules list.").withStyle(ChatFormatting.GRAY));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Invalid rule name.",
+			"RULE-NAME-001",
+			"Use autocomplete or /scamscreener rules list."
+		);
 	}
 
 	public static MutableComponent ruleDisabled(ScamRules.ScamRule rule) {
@@ -484,9 +593,13 @@ public final class Messages {
 	}
 
 	public static MutableComponent invalidAutoCaptureAlertLevel() {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("Invalid auto-capture level. Use: off, low, medium, high, critical.").withStyle(ChatFormatting.GRAY));
+		return ErrorMessages.error(
+			PREFIX,
+			PREFIX_LIGHT_RED,
+			"Invalid auto-capture level.",
+			"AI-CAPTURE-001",
+			"Use: off, low, medium, high, critical."
+		);
 	}
 
 	public static MutableComponent currentAlertRiskLevel(ScamRules.ScamRiskLevel level) {
@@ -514,10 +627,23 @@ public final class Messages {
 		Map<ScamRules.ScamRule, String> details = result.triggeredRules().isEmpty() ? Map.of() : new LinkedHashMap<>(result.triggeredRules());
 		List<String> evaluatedMessages = result.evaluatedMessages();
 		ScamRules.ScamAssessment assessment = new ScamRules.ScamAssessment(score, level, rules, details, evaluatedMessages.isEmpty() ? null : evaluatedMessages.get(0), evaluatedMessages);
-		return behaviorRiskWarning(playerName, assessment);
+		Map<ScamRules.ScamRule, Double> ruleWeights = new LinkedHashMap<>();
+		if (result.signals() != null) {
+			result.signals().forEach(signal -> {
+				if (signal == null || signal.ruleId() == null) {
+					return;
+				}
+				ruleWeights.merge(signal.ruleId(), signal.weight(), Math::max);
+			});
+		}
+		return behaviorRiskWarning(playerName, assessment, ruleWeights.isEmpty() ? null : ruleWeights);
 	}
 
 	public static MutableComponent behaviorRiskWarning(String playerName, ScamRules.ScamAssessment assessment) {
+		return behaviorRiskWarning(playerName, assessment, null);
+	}
+
+	public static MutableComponent behaviorRiskWarning(String playerName, ScamRules.ScamAssessment assessment, Map<ScamRules.ScamRule, Double> ruleWeights) {
 		String levelText = assessment.riskLevel().name();
 		String playerText = playerName == null ? "unknown" : playerName;
 		String scoreText = String.valueOf(assessment.riskScore());
@@ -548,7 +674,7 @@ public final class Messages {
 		}
 
 		String actionMessageId = registerActionMessageId(assessment.allEvaluatedMessages());
-		message.append(Component.literal("\n")).append(actionLine(playerText, actionMessageId));
+		message.append(Component.literal("\n")).append(actionLine(playerText, actionMessageId, assessment, ruleWeights));
 
 		List<String> evaluatedMessages = assessment.allEvaluatedMessages();
 		List<String> highlightTerms = extractQuotedMatches(assessment);
@@ -626,11 +752,13 @@ public final class Messages {
 			case UPFRONT_PAYMENT -> "Upfront Payment";
 			case ACCOUNT_DATA_REQUEST -> "Account Data Request";
 			case EXTERNAL_PLATFORM_PUSH -> "External Platform Push";
+			case DISCORD_HANDLE -> "Discord Handle";
 			case FAKE_MIDDLEMAN_CLAIM -> "Fake Middleman Claim";
 			case TOO_GOOD_TO_BE_TRUE -> "Too Good To Be True";
 			case TRUST_MANIPULATION -> "Trust Manipulation";
 			case SPAMMY_CONTACT_PATTERN -> "Spammy Contact Pattern";
 			case MULTI_MESSAGE_PATTERN -> "Multi-Message Pattern";
+			case SIMILARITY_MATCH -> "Similarity Match";
 			case LOCAL_AI_RISK_SIGNAL -> "Local AI Risk Signal";
 		};
 
@@ -654,22 +782,26 @@ public final class Messages {
 	}
 
 	public static MutableComponent blacklistWarning(String playerName, String triggerReason, BlacklistManager.ScamEntry entry) {
-		String score = entry == null ? "n/a" : String.valueOf(entry.score());
+		String safePlayer = playerName == null ? "n/a" : playerName;
+		String scoreText = entry == null ? "n/a" : String.valueOf(entry.score());
 		String reason = entry == null ? "n/a" : entry.reason();
 		String addedAt = entry == null ? "n/a" : formatTimestamp(entry.addedAt());
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal("SCAM WARNING").withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD))
-			.append(Component.literal("\n- Player: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(playerName == null ? "n/a" : playerName).withStyle(ChatFormatting.AQUA))
-			.append(Component.literal("\n- Score: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(score).withStyle(ChatFormatting.DARK_RED))
-			.append(Component.literal("\n- Reason: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(reason).withStyle(ChatFormatting.YELLOW))
-			.append(Component.literal("\n- Added At: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(addedAt).withStyle(ChatFormatting.GREEN))
-			.append(Component.literal("\n- Trigger: ").withStyle(ChatFormatting.GRAY))
-			.append(Component.literal(triggerReason == null ? "n/a" : triggerReason).withStyle(ChatFormatting.GOLD));
+		int scoreValue = entry == null ? 0 : entry.score();
+		int scoreColor = scoreGradientColor(scoreValue);
+		String playerScoreLine = safePlayer + " | " + scoreText;
+
+		MutableComponent message = Component.empty()
+			.append(Component.literal(WARNING_BORDER).withStyle(ChatFormatting.DARK_RED))
+			.append(Component.literal("\n" + centered("SCAM WARNING")).withStyle(style -> style.withColor(ChatFormatting.DARK_RED).withBold(true)))
+			.append(Component.literal("\n" + leftCenterPadding(playerScoreLine)))
+			.append(Component.literal(safePlayer).withStyle(ChatFormatting.AQUA))
+			.append(Component.literal(" | ").withStyle(ChatFormatting.DARK_GRAY))
+			.append(Component.literal(scoreText).withStyle(style -> style.withColor(scoreColor)))
+			.append(Component.literal("\n" + centered(reason)).withStyle(ChatFormatting.YELLOW))
+			.append(Component.literal("\n" + centered(addedAt)).withStyle(ChatFormatting.GREEN))
+			.append(Component.literal("\n" + centered(triggerReason == null ? "n/a" : triggerReason)).withStyle(ChatFormatting.GOLD));
+
+		return message.append(Component.literal("\n" + WARNING_BORDER).withStyle(ChatFormatting.DARK_RED));
 	}
 
 	private static String formatTimestamp(String input) {
@@ -814,7 +946,7 @@ public final class Messages {
 	private record Match(int start, int end) {
 	}
 
-	private static MutableComponent actionLine(String playerName, String messageId) {
+	private static MutableComponent actionLine(String playerName, String messageId, ScamRules.ScamAssessment assessment, Map<ScamRules.ScamRule, Double> ruleWeights) {
 		MutableComponent line = Component.literal("Actions: ").withStyle(ChatFormatting.GRAY);
 		String target = playerName == null ? "" : playerName.trim();
 		boolean canAct = !target.isBlank() && !"unknown".equalsIgnoreCase(target);
@@ -837,8 +969,8 @@ public final class Messages {
 		line.append(actionTag(
 			"blacklist",
 			ChatFormatting.DARK_RED,
-			"add player to blacklist",
-			canAct ? "/scamscreener add " + target : null
+			blacklistHoverText(assessment, ruleWeights),
+			canAct ? buildBlacklistCommand(target, assessment, ruleWeights) : null
 		));
 
 		return line;
@@ -855,6 +987,74 @@ public final class Messages {
 			style = style.withStrikethrough(true);
 		}
 		return Component.literal("[" + label + "]").setStyle(style);
+	}
+
+	private static String buildBlacklistCommand(String target, ScamRules.ScamAssessment assessment, Map<ScamRules.ScamRule, Double> ruleWeights) {
+		if (target == null || target.isBlank()) {
+			return null;
+		}
+		String reason = bestRuleCode(assessment, ruleWeights);
+		int score = assessment == null ? 50 : assessment.riskScore();
+		int clampedScore = Math.max(0, Math.min(100, score));
+		if (reason == null || reason.isBlank()) {
+			return "/scamscreener add " + target + " " + clampedScore;
+		}
+		return "/scamscreener add " + target + " " + clampedScore + " \"" + escapeCommandReason(reason) + "\"";
+	}
+
+	private static String escapeCommandReason(String reason) {
+		if (reason == null) {
+			return "";
+		}
+		return reason.replace("\"", "\\\"");
+	}
+
+	private static String bestRuleCode(ScamRules.ScamAssessment assessment, Map<ScamRules.ScamRule, Double> ruleWeights) {
+		ScamRules.ScamRule best = null;
+		double bestScore = Double.NEGATIVE_INFINITY;
+		if (ruleWeights != null && !ruleWeights.isEmpty()) {
+			for (Map.Entry<ScamRules.ScamRule, Double> entry : ruleWeights.entrySet()) {
+				if (entry.getKey() == null || entry.getValue() == null) {
+					continue;
+				}
+				double score = entry.getValue();
+				if (best == null || score > bestScore) {
+					best = entry.getKey();
+					bestScore = score;
+				}
+			}
+		}
+		if (best == null && assessment != null && assessment.triggeredRules() != null && !assessment.triggeredRules().isEmpty()) {
+			best = assessment.triggeredRules().stream().sorted(Comparator.naturalOrder()).findFirst().orElse(null);
+		}
+		return best == null ? null : best.name();
+	}
+
+	private static String blacklistHoverText(ScamRules.ScamAssessment assessment, Map<ScamRules.ScamRule, Double> ruleWeights) {
+		if (assessment == null || assessment.triggeredRules() == null || assessment.triggeredRules().isEmpty()) {
+			return "add player to blacklist";
+		}
+		StringBuilder out = new StringBuilder();
+		String best = bestRuleCode(assessment, ruleWeights);
+		if (best != null) {
+			out.append("Reason: ").append(best);
+		}
+		int count = 0;
+		for (ScamRules.ScamRule rule : assessment.triggeredRules().stream().sorted(Comparator.naturalOrder()).collect(Collectors.toList())) {
+			if (rule == null) {
+				continue;
+			}
+			String detail = assessment.detailFor(rule);
+			if (detail == null || detail.isBlank()) {
+				detail = "n/a";
+			}
+			if (count == 0 && out.length() > 0) {
+				out.append("\n");
+			}
+			out.append(rule.name()).append(": ").append(detail);
+			count++;
+		}
+		return out.length() == 0 ? "add player to blacklist" : out.toString();
 	}
 
 	private static String registerActionMessageId(List<String> evaluatedMessages) {

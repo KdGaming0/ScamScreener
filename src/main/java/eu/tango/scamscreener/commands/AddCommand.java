@@ -34,6 +34,11 @@ final class AddCommand {
 						return 0;
 					}
 
+					if (blacklist.contains(target.uuid())) {
+						blacklist.update(target.uuid(), target.name(), 50, "manual-entry");
+						reply.accept(Messages.updatedBlacklistEntry(target.name(), 50, "manual-entry"));
+						return 1;
+					}
 					boolean added = blacklist.add(target.uuid(), target.name(), 50, "manual-entry");
 					reply.accept(added
 						? Messages.addedToBlacklist(target.name(), target.uuid())
@@ -48,6 +53,11 @@ final class AddCommand {
 						}
 
 						int score = IntegerArgumentType.getInteger(context, "score");
+						if (blacklist.contains(target.uuid())) {
+							blacklist.update(target.uuid(), target.name(), score, "manual-entry");
+							reply.accept(Messages.updatedBlacklistEntry(target.name(), score, "manual-entry"));
+							return 1;
+						}
 						boolean added = blacklist.add(target.uuid(), target.name(), score, "manual-entry");
 						reply.accept(added
 							? Messages.addedToBlacklistWithScore(target.name(), target.uuid(), score)
@@ -63,6 +73,11 @@ final class AddCommand {
 
 							int score = IntegerArgumentType.getInteger(context, "score");
 							String reason = StringArgumentType.getString(context, "reason");
+							if (blacklist.contains(target.uuid())) {
+								blacklist.update(target.uuid(), target.name(), score, reason);
+								reply.accept(Messages.updatedBlacklistEntry(target.name(), score, reason));
+								return 1;
+							}
 							boolean added = blacklist.add(target.uuid(), target.name(), score, reason);
 							reply.accept(added
 								? Messages.addedToBlacklistWithMetadata(target.name(), target.uuid())

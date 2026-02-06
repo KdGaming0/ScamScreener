@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import eu.tango.scamscreener.ui.DebugMessages;
+import eu.tango.scamscreener.ui.DebugRegistry;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.network.chat.Component;
@@ -16,7 +17,7 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 final class DebugCommand {
-	private static final List<String> DEBUG_KEYS = List.of("updater", "party", "trade", "mute");
+private static final List<String> DEBUG_KEYS = DebugRegistry.keys();
 
 	private DebugCommand() {
 	}

@@ -14,6 +14,8 @@ import eu.tango.scamscreener.pipeline.model.SignalSource;
 public final class RuleSignalStage {
 	private static final Pattern URGENCY_ALLOWLIST = Pattern.compile("\\b(auction|ah|flip|bin|bid|bidding)\\b");
 	private static final Pattern TRADE_CONTEXT_ALLOWLIST = Pattern.compile("\\b(sell|selling|buy|buying|trade|trading|price|coins?|payment|pay|lf|lb)\\b");
+	private static final Pattern DISCORD_HANDLE_PATTERN = Pattern.compile("@[a-z0-9._-]{2,32}");
+	private static final Pattern DISCORD_WORD_PATTERN = Pattern.compile("\\bdiscord\\b");
 	private static final List<String> URGENCY_KEYWORDS = List.of(
 		"now",
 		"quick",
@@ -156,6 +158,21 @@ public final class RuleSignalStage {
 						+ ", phrases=" + trustScore.phraseHits() + ", threshold=" + TRUST_SCORE_THRESHOLD + ")"
 						+ matchEvidence(trustScore.match()) + " (+10)",
 					ScamRules.ScamRule.TRUST_MANIPULATION,
+					List.of()
+				));
+			}
+		}
+
+		if (ruleConfig.isEnabled(ScamRules.ScamRule.DISCORD_HANDLE)) {
+			Matcher handleMatch = DISCORD_HANDLE_PATTERN.matcher(message);
+			if (DISCORD_WORD_PATTERN.matcher(message).find() && handleMatch.find()) {
+				String handle = handleMatch.group();
+				signals.add(new Signal(
+					ScamRules.ScamRule.DISCORD_HANDLE.name(),
+					SignalSource.RULE,
+					50,
+					"Discord handle with platform mention: \"" + handle + "\" (+50). External platform behavior skipped.",
+					ScamRules.ScamRule.DISCORD_HANDLE,
 					List.of()
 				));
 			}

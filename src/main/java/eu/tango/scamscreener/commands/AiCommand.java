@@ -29,6 +29,7 @@ final class AiCommand {
 		ScamScreenerCommands.CaptureBulkHandler captureBulkHandler,
 		ScamScreenerCommands.MigrateTrainingHandler migrateTrainingHandler,
 		ScamScreenerCommands.ModelUpdateHandler modelUpdateHandler,
+		ScamScreenerCommands.UpdateCheckHandler updateCheckHandler,
 		IntSupplier trainHandler,
 		IntSupplier resetAiHandler,
 		Consumer<Component> reply
@@ -80,6 +81,10 @@ final class AiCommand {
 				.then(ClientCommandManager.argument("id", StringArgumentType.word())
 					.executes(context -> modelUpdateHandler.handle("ignore", StringArgumentType.getString(context, "id")))));
 
+		LiteralArgumentBuilder<FabricClientCommandSource> update = ClientCommandManager.literal("update")
+			.executes(context -> updateCheckHandler.check(false))
+			.then(ClientCommandManager.literal("force").executes(context -> updateCheckHandler.check(true)));
+
 		return ClientCommandManager.literal("ai")
 			.executes(context -> {
 				reply.accept(Messages.aiCommandHelp());
@@ -90,6 +95,7 @@ final class AiCommand {
 			.then(flag)
 			.then(migrate)
 			.then(model)
+			.then(update)
 			.then(ClientCommandManager.literal("train").executes(context -> trainHandler.getAsInt()))
 			.then(ClientCommandManager.literal("reset").executes(context -> resetAiHandler.getAsInt()))
 			.then(ClientCommandManager.literal("autocapture")
@@ -111,6 +117,7 @@ final class AiCommand {
 						String input = StringArgumentType.getString(context, "level");
 						String updated = ScamRules.setAutoCaptureAlertLevelSetting(input);
 						if (updated == null) {
+							// Code: AI-CAPTURE-001
 							reply.accept(Messages.invalidAutoCaptureAlertLevel());
 							return 0;
 						}

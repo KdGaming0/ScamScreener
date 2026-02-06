@@ -17,6 +17,7 @@ public final class MutePatternsConfig {
 	private static final Path FILE_PATH = ScamScreenerPaths.inModConfigDir("scam-screener-mute.json");
 
 	public List<String> patterns = new ArrayList<>();
+	public Boolean enabled = true;
 	public boolean notifyEnabled = true;
 	public int notifyIntervalSeconds = 30;
 
@@ -37,6 +38,9 @@ public final class MutePatternsConfig {
 			}
 			if (loaded.notifyIntervalSeconds < 5 || loaded.notifyIntervalSeconds > 600) {
 				loaded.notifyIntervalSeconds = 30;
+			}
+			if (loaded.enabled == null) {
+				loaded.enabled = true;
 			}
 			return loaded;
 		} catch (IOException ignored) {

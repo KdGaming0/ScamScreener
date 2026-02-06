@@ -13,9 +13,11 @@ import java.util.regex.Pattern;
 
 final class TokenFeatureExtractor {
 	private static final Pattern TOKEN_PATTERN = Pattern.compile("[a-z0-9_]{3,24}");
-	private static final String KW_PREFIX = "kw:";
 	private static final String BI_PREFIX = "ng2:";
 	private static final String TRI_PREFIX = "ng3:";
+	private static final String QUAD_PREFIX = "ng4:";
+	private static final String PENTA_PREFIX = "ng5:";
+	private static final int MAX_NGRAM = 5;
 
 	private TokenFeatureExtractor() {
 	}
@@ -32,7 +34,7 @@ final class TokenFeatureExtractor {
 		return tokens;
 	}
 
-	private static List<String> wordSequence(String text) {
+	static List<String> wordSequence(String text) {
 		List<String> tokens = new ArrayList<>();
 		if (text == null || text.isBlank()) {
 			return tokens;
@@ -53,17 +55,33 @@ final class TokenFeatureExtractor {
 
 		Set<String> features = new LinkedHashSet<>();
 		for (int i = 0; i < words.size(); i++) {
-			String unigram = words.get(i);
-			features.add(KW_PREFIX + unigram);
-
-			if (i + 1 < words.size()) {
-				features.add(BI_PREFIX + unigram + " " + words.get(i + 1));
-			}
-			if (i + 2 < words.size()) {
-				features.add(TRI_PREFIX + unigram + " " + words.get(i + 1) + " " + words.get(i + 2));
+			for (int n = 2; n <= MAX_NGRAM; n++) {
+				if (i + n - 1 >= words.size()) {
+					break;
+				}
+				String phrase = joinNgram(words, i, n);
+				switch (n) {
+					case 2 -> features.add(BI_PREFIX + phrase);
+					case 3 -> features.add(TRI_PREFIX + phrase);
+					case 4 -> features.add(QUAD_PREFIX + phrase);
+					case 5 -> features.add(PENTA_PREFIX + phrase);
+					default -> {
+					}
+				}
 			}
 		}
 		return features;
+	}
+
+	private static String joinNgram(List<String> words, int start, int length) {
+		StringBuilder out = new StringBuilder();
+		for (int i = 0; i < length; i++) {
+			if (i > 0) {
+				out.append(' ');
+			}
+			out.append(words.get(start + i));
+		}
+		return out.toString();
 	}
 
 	static List<String> buildVocab(Collection<LocalAiTrainer.Sample> samples, int maxSize, int minCount) {
