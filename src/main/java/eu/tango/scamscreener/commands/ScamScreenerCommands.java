@@ -98,26 +98,26 @@ public final class ScamScreenerCommands {
 				return 1;
 			})
 			.then(AddCommand.build(blacklist, targetResolver, reply))
-				.then(RemoveCommand.build(blacklist, targetResolver, onBlacklistRemoved, reply))
-				.then(ListCommand.build(blacklist, reply))
-				.then(MuteCommand.build(mutePatternManager, reply))
-				.then(UnmuteCommand.build(mutePatternManager, reply))
-				.then(EmailBypassCommand.build(emailBypassHandler, reply))
-				.then(AiCommand.build(
-					captureByPlayerHandler,
-					captureByMessageHandler,
-					captureBulkHandler,
-					migrateTrainingHandler,
-					modelUpdateHandler,
-					updateCheckHandler,
-					trainHandler,
-					resetAiHandler,
-					reply
-				))
-				.then(RuleCommand.build(reply))
-				.then(AlertLevelCommand.build(reply))
-				.then(AutoLeaveCommand.build(autoLeaveEnabledSupplier, setAutoLeaveEnabledHandler, reply))
-				.then(DebugCommand.build(setAllDebugHandler, setDebugKeyHandler, debugStateSupplier, reply))
+			.then(RemoveCommand.build(blacklist, targetResolver, onBlacklistRemoved, reply))
+			.then(ListCommand.build(blacklist, reply))
+			.then(MuteCommand.build(mutePatternManager, reply))
+			.then(UnmuteCommand.build(mutePatternManager, reply))
+			.then(EmailBypassCommand.build(emailBypassHandler, reply))
+			.then(AiCommand.build(
+				captureByPlayerHandler,
+				captureByMessageHandler,
+				captureBulkHandler,
+				migrateTrainingHandler,
+				modelUpdateHandler,
+				updateCheckHandler,
+				trainHandler,
+				resetAiHandler,
+				reply
+			))
+			.then(RuleCommand.build(reply))
+			.then(AlertLevelCommand.build(reply))
+			.then(AutoLeaveCommand.build(autoLeaveEnabledSupplier, setAutoLeaveEnabledHandler, reply))
+			.then(DebugCommand.build(setAllDebugHandler, setDebugKeyHandler, debugStateSupplier, reply))
 			.then(VersionCommand.build(reply))
 			.then(PreviewCommand.build(reply, lastCapturedChatSupplier));
 	}

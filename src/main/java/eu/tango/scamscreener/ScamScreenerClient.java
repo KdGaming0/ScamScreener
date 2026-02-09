@@ -10,8 +10,8 @@ import eu.tango.scamscreener.blacklist.BlacklistManager;
 import eu.tango.scamscreener.blacklist.BlacklistAlertService;
 import eu.tango.scamscreener.client.ClientTickController;
 import eu.tango.scamscreener.commands.ScamScreenerCommands;
-import eu.tango.scamscreener.config.AutoLeaveConfig;
 import eu.tango.scamscreener.config.DebugConfig;
+import eu.tango.scamscreener.config.ScamRulesConfig;
 import eu.tango.scamscreener.chat.mute.MutePatternManager;
 import eu.tango.scamscreener.chat.parser.ChatLineParser;
 import eu.tango.scamscreener.chat.trigger.TriggerContext;
@@ -67,7 +67,7 @@ public class ScamScreenerClient implements ClientModInitializer {
 	private final ModelUpdateCommandHandler modelUpdateCommandHandler = new ModelUpdateCommandHandler(modelUpdateService);
 	private final BypassCommandHandler bypassCommandHandler = new BypassCommandHandler(emailSafety, discordSafety);
 	private final TargetResolutionService targetResolutionService = new TargetResolutionService(playerLookup, mojangProfileService, BLACKLIST);
-	private AutoLeaveConfig autoLeaveConfig;
+	private boolean autoLeaveOnBlacklist;
 	private DebugConfig debugConfig;
 	private DebugReporter debugReporter;
 	private BlacklistAlertService blacklistAlertService;
@@ -78,11 +78,11 @@ public class ScamScreenerClient implements ClientModInitializer {
 	public void onInitializeClient() {
 		BLACKLIST.load();
 		ScamRules.reloadConfig();
+		autoLeaveOnBlacklist = ScamRulesConfig.loadOrCreate().autoLeaveOnBlacklist;
 		mutePatternManager.load();
-		loadAutoLeaveConfig();
 		loadDebugConfig();
 		debugReporter = new DebugReporter(debugConfig);
-		blacklistAlertService = new BlacklistAlertService(BLACKLIST, playerLookup, debugReporter, this::isAutoLeaveEnabled);
+		blacklistAlertService = new BlacklistAlertService(BLACKLIST, playerLookup, debugReporter, () -> autoLeaveOnBlacklist);
 		flaggingController = new FlaggingController(trainingCommandHandler);
 		tickController = new ClientTickController(
 			flaggingController,
@@ -99,6 +99,14 @@ public class ScamScreenerClient implements ClientModInitializer {
 	}
 
 	private void registerCommands() {
+		java.util.function.Consumer<Boolean> setAutoLeaveHandler = enabled -> {
+			ScamRulesConfig rulesConfig = ScamRulesConfig.loadOrCreate();
+			rulesConfig.autoLeaveOnBlacklist = enabled;
+			ScamRulesConfig.save(rulesConfig);
+			ScamRules.reloadConfig();
+			autoLeaveOnBlacklist = enabled;
+		};
+
 		ScamScreenerCommands commands = new ScamScreenerCommands(
 			BLACKLIST,
 			targetResolutionService::resolveTargetOrReply,
@@ -113,8 +121,8 @@ public class ScamScreenerClient implements ClientModInitializer {
 			this::setAllDebug,
 			this::setDebugKey,
 			this::debugStateSnapshot,
-			this::isAutoLeaveEnabled,
-			this::setAutoLeaveEnabled,
+			() -> autoLeaveOnBlacklist,
+			setAutoLeaveHandler,
 			trainingCommandHandler::trainLocalAiModel,
 			trainingCommandHandler::resetLocalAiModel,
 			trainingDataService::lastCapturedLine,
@@ -226,28 +234,6 @@ public class ScamScreenerClient implements ClientModInitializer {
 			debugConfig = new DebugConfig();
 		}
 		modelUpdateService.setDebugEnabled(debugConfig.isEnabled("updater"));
-	}
-
-	private void loadAutoLeaveConfig() {
-		autoLeaveConfig = AutoLeaveConfig.loadOrCreate();
-		if (autoLeaveConfig == null) {
-			autoLeaveConfig = new AutoLeaveConfig();
-		}
-		if (autoLeaveConfig.enabled == null) {
-			autoLeaveConfig.enabled = false;
-		}
-	}
-
-	private boolean isAutoLeaveEnabled() {
-		return autoLeaveConfig != null && Boolean.TRUE.equals(autoLeaveConfig.enabled);
-	}
-
-	private void setAutoLeaveEnabled(boolean enabled) {
-		if (autoLeaveConfig == null) {
-			autoLeaveConfig = new AutoLeaveConfig();
-		}
-		autoLeaveConfig.enabled = enabled;
-		AutoLeaveConfig.save(autoLeaveConfig);
 	}
 
 	private void updateDebugConfig() {

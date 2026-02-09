@@ -162,8 +162,7 @@ Alle Mod-Dateien liegen unter:
 Wichtige Dateien:
 
 - `scam-screener-blacklist.json` -> Blacklist-Entries
-- `scam-screener-auto-leave.json` -> Auto-`/p leave` bei Blacklist-Treffer
-- `scam-screener-rules.json` -> Rule-Pattern, AI-Thresholds, disabled rules
+- `scam-screener-rules.json` -> Rule-Pattern, AI-Thresholds, disabled rules, Auto-`/p leave` (`autoLeaveOnBlacklist`)
 - `scam-screener-local-ai-model.json` -> lokales Modell + Weights
 - `scam-screener-training-data.csv` -> Trainingssamples
 - `scam-screener-mute.json` -> Mute-Pattern + Notify-Settings

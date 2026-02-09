@@ -31,6 +31,7 @@ public final class ScamRulesConfig {
 	public static final double DEFAULT_LOCAL_AI_TRIGGER_PROBABILITY = 0.56;
 	public static final String DEFAULT_MIN_ALERT_RISK_LEVEL = "HIGH";
 	public static final String DEFAULT_AUTO_CAPTURE_ALERT_LEVEL = "OFF";
+	public static final boolean DEFAULT_AUTO_LEAVE_ON_BLACKLIST = false;
 	public static final int DEFAULT_LEVEL_MEDIUM = 20;
 	public static final int DEFAULT_LEVEL_HIGH = 40;
 	public static final int DEFAULT_LEVEL_CRITICAL = 70;
@@ -63,6 +64,7 @@ public final class ScamRulesConfig {
 	public double localAiTriggerProbability = DEFAULT_LOCAL_AI_TRIGGER_PROBABILITY;
 	public String minAlertRiskLevel = DEFAULT_MIN_ALERT_RISK_LEVEL;
 	public String autoCaptureAlertLevel = DEFAULT_AUTO_CAPTURE_ALERT_LEVEL;
+	public boolean autoLeaveOnBlacklist = DEFAULT_AUTO_LEAVE_ON_BLACKLIST;
 	public int levelMedium = DEFAULT_LEVEL_MEDIUM;
 	public int levelHigh = DEFAULT_LEVEL_HIGH;
 	public int levelCritical = DEFAULT_LEVEL_CRITICAL;
