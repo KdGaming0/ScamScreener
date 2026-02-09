@@ -37,6 +37,7 @@ public final class ScamScreenerCommands {
 	private final IntSupplier resetAiHandler;
 	private final Supplier<String> lastCapturedChatSupplier;
 	private final Consumer<UUID> onBlacklistRemoved;
+	private final Runnable openSettingsHandler;
 	private final Consumer<Component> reply;
 
 	public ScamScreenerCommands(
@@ -59,6 +60,7 @@ public final class ScamScreenerCommands {
 		IntSupplier resetAiHandler,
 		Supplier<String> lastCapturedChatSupplier,
 		Consumer<UUID> onBlacklistRemoved,
+		Runnable openSettingsHandler,
 		Consumer<Component> reply
 	) {
 		this.blacklist = blacklist;
@@ -80,6 +82,7 @@ public final class ScamScreenerCommands {
 		this.resetAiHandler = resetAiHandler;
 		this.lastCapturedChatSupplier = lastCapturedChatSupplier;
 		this.onBlacklistRemoved = onBlacklistRemoved;
+		this.openSettingsHandler = openSettingsHandler;
 		this.reply = reply;
 	}
 
@@ -117,6 +120,7 @@ public final class ScamScreenerCommands {
 			.then(RuleCommand.build(reply))
 			.then(AlertLevelCommand.build(reply))
 			.then(AutoLeaveCommand.build(autoLeaveEnabledSupplier, setAutoLeaveEnabledHandler, reply))
+			.then(SettingsCommand.build(openSettingsHandler))
 			.then(DebugCommand.build(setAllDebugHandler, setDebugKeyHandler, debugStateSupplier, reply))
 			.then(VersionCommand.build(reply))
 			.then(PreviewCommand.build(reply, lastCapturedChatSupplier));

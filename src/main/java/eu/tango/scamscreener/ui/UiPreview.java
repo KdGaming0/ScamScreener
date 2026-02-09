@@ -23,8 +23,7 @@ import java.util.function.Supplier;
 public final class UiPreview {
 	private static final List<Class<?>> PREVIEW_CLASSES = List.of(
 		Messages.class,
-		DebugMessages.class,
-		ErrorMessages.class
+		DebugMessages.class
 	);
 
 	private UiPreview() {

@@ -2,34 +2,37 @@ package eu.tango.scamscreener.client;
 
 import eu.tango.scamscreener.chat.mute.MutePatternManager;
 import eu.tango.scamscreener.pipeline.core.DetectionPipeline;
-import eu.tango.scamscreener.ui.FlaggingController;
 import eu.tango.scamscreener.ui.Messages;
 import net.minecraft.client.Minecraft;
 
 public final class ClientTickController {
-	private final FlaggingController flaggingController;
 	private final MutePatternManager mutePatternManager;
 	private final DetectionPipeline detectionPipeline;
-	private final int legitLabel;
-	private final int scamLabel;
+	private final Runnable openSettingsAction;
 	private boolean checkedModelUpdate;
+	private boolean openSettingsRequested;
 
-	public ClientTickController(FlaggingController flaggingController,
-		MutePatternManager mutePatternManager,
+	public ClientTickController(MutePatternManager mutePatternManager,
 		DetectionPipeline detectionPipeline,
-		int legitLabel,
-		int scamLabel
+		Runnable openSettingsAction
 	) {
-		this.flaggingController = flaggingController;
 		this.mutePatternManager = mutePatternManager;
 		this.detectionPipeline = detectionPipeline;
-		this.legitLabel = legitLabel;
-		this.scamLabel = scamLabel;
+		this.openSettingsAction = openSettingsAction;
+	}
+
+	public void requestOpenSettings() {
+		openSettingsRequested = true;
 	}
 
 	public void onClientTick(Minecraft client, Runnable modelUpdateCheck) {
-		flaggingController.updateHoveredFlagTarget(client);
-		flaggingController.handleFlagKeybinds(client, legitLabel, scamLabel);
+		if (openSettingsRequested) {
+			openSettingsRequested = false;
+			if (openSettingsAction != null) {
+				openSettingsAction.run();
+			}
+		}
+
 		if (client.player == null || client.getConnection() == null) {
 			detectionPipeline.reset();
 			checkedModelUpdate = false;

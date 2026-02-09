@@ -15,6 +15,7 @@ import eu.tango.scamscreener.config.ScamRulesConfig;
 import eu.tango.scamscreener.chat.mute.MutePatternManager;
 import eu.tango.scamscreener.chat.parser.ChatLineParser;
 import eu.tango.scamscreener.chat.trigger.TriggerContext;
+import eu.tango.scamscreener.gui.MainSettingsScreen;
 import eu.tango.scamscreener.pipeline.model.DetectionOutcome;
 import eu.tango.scamscreener.pipeline.core.DetectionPipeline;
 import eu.tango.scamscreener.pipeline.model.MessageEvent;
@@ -24,16 +25,13 @@ import eu.tango.scamscreener.lookup.PlayerLookup;
 import eu.tango.scamscreener.lookup.TargetResolutionService;
 import eu.tango.scamscreener.rules.ScamRules;
 import eu.tango.scamscreener.ui.Messages;
-import eu.tango.scamscreener.ui.Keybinds;
 import eu.tango.scamscreener.ui.DebugRegistry;
 import eu.tango.scamscreener.ui.ChatDecorator;
 import eu.tango.scamscreener.ui.DebugReporter;
-import eu.tango.scamscreener.ui.FlaggingController;
 import eu.tango.scamscreener.ui.MessageDispatcher;
 import eu.tango.scamscreener.ui.NotificationService;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientSendMessageEvents;
 import net.minecraft.client.Minecraft;
@@ -51,8 +49,6 @@ import eu.tango.scamscreener.security.BypassCommandHandler;
 public class ScamScreenerClient implements ClientModInitializer {
 	private static final BlacklistManager BLACKLIST = new BlacklistManager();
 	private static final Logger LOGGER = LoggerFactory.getLogger(ScamScreenerClient.class);
-	private static final int LEGIT_LABEL = 0;
-	private static final int SCAM_LABEL = 1;
 	private final PlayerLookup playerLookup = new PlayerLookup();
 	private final MojangProfileService mojangProfileService = new MojangProfileService();
 	private final TrainingDataService trainingDataService = new TrainingDataService();
@@ -71,7 +67,6 @@ public class ScamScreenerClient implements ClientModInitializer {
 	private DebugConfig debugConfig;
 	private DebugReporter debugReporter;
 	private BlacklistAlertService blacklistAlertService;
-	private FlaggingController flaggingController;
 	private ClientTickController tickController;
 
 	@Override
@@ -83,29 +78,39 @@ public class ScamScreenerClient implements ClientModInitializer {
 		loadDebugConfig();
 		debugReporter = new DebugReporter(debugConfig);
 		blacklistAlertService = new BlacklistAlertService(BLACKLIST, playerLookup, debugReporter, () -> autoLeaveOnBlacklist);
-		flaggingController = new FlaggingController(trainingCommandHandler);
+		Runnable openSettingsAction = () -> {
+			Minecraft client = Minecraft.getInstance();
+			if (client == null) {
+				return;
+			}
+			client.setScreen(new MainSettingsScreen(
+				client.screen,
+				BLACKLIST,
+				mutePatternManager,
+				() -> autoLeaveOnBlacklist,
+				this::setAutoLeaveEnabled,
+				this::setAllDebug,
+				this::setDebugKey,
+				this::debugStateSnapshot,
+				() -> modelUpdateCommandHandler.handleModelUpdateCheck(false),
+				() -> modelUpdateCommandHandler.handleModelUpdateCheck(true),
+				modelUpdateCommandHandler::latestPendingSnapshot,
+				modelUpdateCommandHandler::handleModelUpdateCommand
+			));
+		};
 		tickController = new ClientTickController(
-			flaggingController,
 			mutePatternManager,
 			detectionPipeline,
-			LEGIT_LABEL,
-			SCAM_LABEL
+			openSettingsAction
 		);
 		registerCommands();
-		Keybinds.register();
-		ClientLifecycleEvents.CLIENT_STARTED.register(client -> Keybinds.register());
 		registerHypixelMessageChecks();
-		ClientTickEvents.END_CLIENT_TICK.register(this::onClientTick);
+		ClientTickEvents.END_CLIENT_TICK.register(client ->
+			tickController.onClientTick(client, () -> modelUpdateService.checkForUpdateAsync(MessageDispatcher::reply)));
 	}
 
 	private void registerCommands() {
-		java.util.function.Consumer<Boolean> setAutoLeaveHandler = enabled -> {
-			ScamRulesConfig rulesConfig = ScamRulesConfig.loadOrCreate();
-			rulesConfig.autoLeaveOnBlacklist = enabled;
-			ScamRulesConfig.save(rulesConfig);
-			ScamRules.reloadConfig();
-			autoLeaveOnBlacklist = enabled;
-		};
+		Runnable openSettingsHandler = tickController::requestOpenSettings;
 
 		ScamScreenerCommands commands = new ScamScreenerCommands(
 			BLACKLIST,
@@ -122,11 +127,12 @@ public class ScamScreenerClient implements ClientModInitializer {
 			this::setDebugKey,
 			this::debugStateSnapshot,
 			() -> autoLeaveOnBlacklist,
-			setAutoLeaveHandler,
+			this::setAutoLeaveEnabled,
 			trainingCommandHandler::trainLocalAiModel,
 			trainingCommandHandler::resetLocalAiModel,
 			trainingDataService::lastCapturedLine,
 			ignored -> {},
+			openSettingsHandler,
 			MessageDispatcher::reply
 		);
 		commands.register();
@@ -142,10 +148,6 @@ public class ScamScreenerClient implements ClientModInitializer {
 		ClientReceiveMessageEvents.CHAT.register((message, signedMessage, sender, params, timestamp) -> handleHypixelMessage(message));
 		ClientSendMessageEvents.ALLOW_CHAT.register(outgoingMessageGuard::allowChat);
 		ClientSendMessageEvents.ALLOW_COMMAND.register(outgoingMessageGuard::allowCommand);
-	}
-
-	private void onClientTick(Minecraft client) {
-		tickController.onClientTick(client, () -> modelUpdateService.checkForUpdateAsync(MessageDispatcher::reply));
 	}
 
 	private void handleHypixelMessage(Component message) {
@@ -205,6 +207,14 @@ public class ScamScreenerClient implements ClientModInitializer {
 		modelUpdateService.setDebugEnabled(enabled);
 		debugConfig.setAll(enabled);
 		updateDebugConfig();
+	}
+
+	private void setAutoLeaveEnabled(boolean enabled) {
+		ScamRulesConfig rulesConfig = ScamRulesConfig.loadOrCreate();
+		rulesConfig.autoLeaveOnBlacklist = enabled;
+		ScamRulesConfig.save(rulesConfig);
+		ScamRules.reloadConfig();
+		autoLeaveOnBlacklist = enabled;
 	}
 
 	private void setDebugKey(String key, boolean enabled) {

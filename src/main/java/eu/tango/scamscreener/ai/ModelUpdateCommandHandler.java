@@ -23,4 +23,8 @@ public final class ModelUpdateCommandHandler {
 		modelUpdateService.checkForUpdateAndDownloadAsync(MessageDispatcher::reply, force);
 		return 1;
 	}
+
+	public ModelUpdateService.PendingUpdateSnapshot latestPendingSnapshot() {
+		return modelUpdateService.latestPendingSnapshot();
+	}
 }

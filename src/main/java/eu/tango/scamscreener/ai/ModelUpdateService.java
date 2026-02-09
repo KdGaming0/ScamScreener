@@ -29,6 +29,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public final class ModelUpdateService {
@@ -38,7 +39,8 @@ public final class ModelUpdateService {
 		.build();
 	private static final String VERSION_URL = "https://raw.githubusercontent.com/Tangos-Mods/ScamScreener/main/scripts/model-version.json";
 
-	private final Map<String, PendingModel> pending = new LinkedHashMap<>();
+	private final Map<String, PendingModel> pending = new ConcurrentHashMap<>();
+	private volatile String latestPendingId;
 	private boolean debugEnabled;
 
 	public void checkForUpdateAsync(Consumer<Component> reply) {
@@ -61,6 +63,19 @@ public final class ModelUpdateService {
 
 	public boolean isDebugEnabled() {
 		return debugEnabled;
+	}
+
+	public PendingUpdateSnapshot latestPendingSnapshot() {
+		String id = latestPendingId;
+		if (id == null || id.isBlank()) {
+			return null;
+		}
+		PendingModel pendingModel = pending.get(id);
+		if (pendingModel == null || pendingModel.info() == null) {
+			return null;
+		}
+		boolean downloaded = pendingModel.content() != null && !pendingModel.content().isBlank();
+		return new PendingUpdateSnapshot(id, pendingModel.info().version(), downloaded);
 	}
 
 	public int download(String id, Consumer<Component> reply) {
@@ -90,7 +105,7 @@ public final class ModelUpdateService {
 			ScamRules.reloadConfig();
 			reply.accept(Messages.modelUpdateApplied("accepted"));
 			debug(reply, "accepted id=" + id);
-			pending.remove(id);
+			removePending(id);
 			return 1;
 		} catch (IOException e) {
 			debug(reply, "accept failed: " + e.getMessage());
@@ -128,7 +143,7 @@ public final class ModelUpdateService {
 			ScamRules.reloadConfig();
 			reply.accept(Messages.modelUpdateApplied("merged"));
 			debug(reply, "merged id=" + id);
-			pending.remove(id);
+			removePending(id);
 			return 1;
 		} catch (Exception e) {
 			debug(reply, "merge failed: " + e.getMessage());
@@ -139,7 +154,7 @@ public final class ModelUpdateService {
 	}
 
 	public int ignore(String id, Consumer<Component> reply) {
-		if (pending.remove(id) != null) {
+		if (removePending(id) != null) {
 			reply.accept(Messages.modelUpdateIgnored());
 			debug(reply, "ignored id=" + id);
 			return 1;
@@ -175,6 +190,7 @@ public final class ModelUpdateService {
 
 		String id = UUID.randomUUID().toString().replace("-", "");
 		pending.put(id, new PendingModel(info, null));
+		latestPendingId = id;
 		if (autoDownload) {
 			debug(reply, "update available id=" + id + " (auto-download)");
 			downloadModel(id, pending.get(id), reply);
@@ -208,6 +224,7 @@ public final class ModelUpdateService {
 		}
 
 		pending.put(id, new PendingModel(pendingModel.info(), payload));
+		latestPendingId = id;
 		reply.accept(Messages.modelUpdateReady(buildActionComponent(id)));
 		debug(reply, "downloaded id=" + id);
 	}
@@ -328,6 +345,14 @@ public final class ModelUpdateService {
 		reply.accept(DebugMessages.updater(message));
 	}
 
+	private PendingModel removePending(String id) {
+		PendingModel removed = pending.remove(id);
+		if (id != null && id.equals(latestPendingId)) {
+			latestPendingId = null;
+		}
+		return removed;
+	}
+
 	private static MutableComponent buildActionComponent(String id) {
 		MutableComponent line = Component.empty()
 			.append(Component.literal("[Accept]").withStyle(Style.EMPTY
@@ -354,5 +379,8 @@ public final class ModelUpdateService {
 	}
 
 	private record PendingModel(ModelVersionInfo info, String content) {
+	}
+
+	public record PendingUpdateSnapshot(String id, String version, boolean downloaded) {
 	}
 }

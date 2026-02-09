@@ -41,6 +41,14 @@ public class ScamRules {
 		return config.localAiEnabled();
 	}
 
+	public static boolean setLocalAiEnabled(boolean enabled) {
+		ScamRulesConfig cfg = ScamRulesConfig.loadOrCreate();
+		cfg.localAiEnabled = enabled;
+		ScamRulesConfig.save(cfg);
+		reloadConfig();
+		return config.localAiEnabled();
+	}
+
 	public static int localAiMaxScore() {
 		return config.localAiMaxScore();
 	}
@@ -51,6 +59,26 @@ public class ScamRules {
 
 	public static String autoCaptureAlertLevelSetting() {
 		return config.autoCaptureAlertLevelSetting();
+	}
+
+	public static boolean showScamWarningMessage() {
+		return config.showScamWarningMessage();
+	}
+
+	public static boolean pingOnScamWarning() {
+		return config.pingOnScamWarning();
+	}
+
+	public static boolean showBlacklistWarningMessage() {
+		return config.showBlacklistWarningMessage();
+	}
+
+	public static boolean pingOnBlacklistWarning() {
+		return config.pingOnBlacklistWarning();
+	}
+
+	public static boolean showAutoLeaveMessage() {
+		return config.showAutoLeaveMessage();
 	}
 
 	public static int levelMediumThreshold() {
@@ -121,6 +149,46 @@ public class ScamRules {
 		ScamRulesConfig.save(cfg);
 		reloadConfig();
 		return config.autoCaptureAlertLevelSetting();
+	}
+
+	public static boolean setShowScamWarningMessage(boolean enabled) {
+		ScamRulesConfig cfg = ScamRulesConfig.loadOrCreate();
+		cfg.showScamWarningMessage = enabled;
+		ScamRulesConfig.save(cfg);
+		reloadConfig();
+		return config.showScamWarningMessage();
+	}
+
+	public static boolean setPingOnScamWarning(boolean enabled) {
+		ScamRulesConfig cfg = ScamRulesConfig.loadOrCreate();
+		cfg.pingOnScamWarning = enabled;
+		ScamRulesConfig.save(cfg);
+		reloadConfig();
+		return config.pingOnScamWarning();
+	}
+
+	public static boolean setShowBlacklistWarningMessage(boolean enabled) {
+		ScamRulesConfig cfg = ScamRulesConfig.loadOrCreate();
+		cfg.showBlacklistWarningMessage = enabled;
+		ScamRulesConfig.save(cfg);
+		reloadConfig();
+		return config.showBlacklistWarningMessage();
+	}
+
+	public static boolean setPingOnBlacklistWarning(boolean enabled) {
+		ScamRulesConfig cfg = ScamRulesConfig.loadOrCreate();
+		cfg.pingOnBlacklistWarning = enabled;
+		ScamRulesConfig.save(cfg);
+		reloadConfig();
+		return config.pingOnBlacklistWarning();
+	}
+
+	public static boolean setShowAutoLeaveMessage(boolean enabled) {
+		ScamRulesConfig cfg = ScamRulesConfig.loadOrCreate();
+		cfg.showAutoLeaveMessage = enabled;
+		ScamRulesConfig.save(cfg);
+		reloadConfig();
+		return config.showAutoLeaveMessage();
 	}
 
 	public static Set<ScamRule> disabledRules() {
@@ -294,6 +362,11 @@ public class ScamRules {
 		double localAiTriggerProbability,
 		ScamRiskLevel minimumAlertRiskLevel,
 		AutoCaptureAlertLevel autoCaptureAlertLevel,
+		boolean showScamWarningMessage,
+		boolean pingOnScamWarning,
+		boolean showBlacklistWarningMessage,
+		boolean pingOnBlacklistWarning,
+		boolean showAutoLeaveMessage,
 		int levelMediumThreshold,
 		int levelHighThreshold,
 		int levelCriticalThreshold,
@@ -325,6 +398,11 @@ public class ScamRules {
 				config.localAiTriggerProbability,
 				parseRiskLevelOrDefault(config.minAlertRiskLevel, ScamRiskLevel.HIGH),
 				AutoCaptureAlertLevel.parseOrDefault(config.autoCaptureAlertLevel, AutoCaptureAlertLevel.OFF),
+				config.showScamWarningMessage,
+				config.pingOnScamWarning,
+				config.showBlacklistWarningMessage,
+				config.pingOnBlacklistWarning,
+				config.showAutoLeaveMessage,
 				config.levelMedium,
 				config.levelHigh,
 				config.levelCritical,

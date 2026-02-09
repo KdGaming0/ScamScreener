@@ -8,7 +8,7 @@ Der Mod kombiniert:
 - ein lokales, trainierbares KI-Scoring (ohne Cloud-Zwang),
 - sowie Chat-Muting ueber eigene Pattern.
 
-> Aktueller Stand laut `gradle.properties`: **Version 0.13.5**
+> Aktueller Stand laut `gradle.properties`: **Version 0.14.1**
 
 ## Warum dieser Mod?
 
@@ -134,6 +134,7 @@ Artefakt liegt danach in `build/libs/`.
 - `/scamscreener alertlevel [low|medium|high|critical]`
 - `/scamscreener autoleave [on|off|status]` (ohne Argument: Toggle)
 - `/scamscreener rules <list|disable|enable> [rule]`
+- `/scamscreener settings` (oeffnet GUI fuer Settings)
 - `/scamscreener version`
 - `/scamscreener preview` (Dry-Run + Live-Preview anhand letzter Chatzeile)
 

@@ -10,9 +10,9 @@ import net.minecraft.network.chat.ClickEvent;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-public final class DebugMessages {
-	private static final String PREFIX = "[ScamScreener] ";
-	private static final int PREFIX_LIGHT_RED = 0xFF5555;
+public final class DebugMessages extends MessageBuilder {
+	private static final String PREFIX = DEFAULT_PREFIX;
+	private static final int PREFIX_LIGHT_RED = DEFAULT_PREFIX_COLOR;
 	private static final ChatFormatting LABEL_COLOR = ChatFormatting.DARK_GRAY;
 	private static final ChatFormatting MESSAGE_COLOR = ChatFormatting.GRAY;
 	private static final ChatFormatting ACTIVE_COLOR = ChatFormatting.GREEN;
@@ -49,8 +49,7 @@ public final class DebugMessages {
 			return debugStatus("no debug states");
 		}
 		Map<String, Boolean> ordered = new LinkedHashMap<>(states);
-		MutableComponent line = Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
+		MutableComponent line = prefixedMessage(PREFIX, PREFIX_LIGHT_RED)
 			.append(Component.literal("Debug: ").withStyle(LABEL_COLOR));
 
 		boolean first = true;
@@ -74,9 +73,6 @@ public final class DebugMessages {
 	}
 
 	private static MutableComponent labeled(String label, String message) {
-		return Component.literal(PREFIX)
-			.withStyle(style -> style.withColor(PREFIX_LIGHT_RED))
-			.append(Component.literal(label + ": ").withStyle(LABEL_COLOR))
-			.append(Component.literal(message == null ? "" : message).withStyle(MESSAGE_COLOR));
+		return labeledMessage(PREFIX, PREFIX_LIGHT_RED, LABEL_COLOR, MESSAGE_COLOR, label, message);
 	}
 }
