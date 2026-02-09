@@ -25,24 +25,6 @@ public final class TrainingCommandHandler {
 		this.localAiTrainer = localAiTrainer;
 	}
 
-	public int flagHoveredMessage(int label) {
-		String message = MessageFlagging.hoveredMessage();
-		if (message == null || message.isBlank()) {
-			MessageDispatcher.reply(Messages.noChatToCapture());
-			return 0;
-		}
-		try {
-			trainingDataService.appendRows(List.of(message), label);
-			MessageDispatcher.reply(Messages.trainingSampleFlagged(label == LEGIT_LABEL ? "legit" : "scam"));
-			return 1;
-		} catch (IOException e) {
-			LOGGER.warn("Failed to save training sample from hover", e);
-			// Code: TR-SAVE-002
-			MessageDispatcher.reply(Messages.trainingSamplesSaveFailed(trainingErrorDetail(e, trainingDataService.trainingDataPath())));
-			return 0;
-		}
-	}
-
 	public int captureChatAsTrainingData(String playerName, int label, int count) {
 		List<String> lines = trainingDataService.recentLinesForPlayer(playerName, count);
 		if (lines.isEmpty()) {

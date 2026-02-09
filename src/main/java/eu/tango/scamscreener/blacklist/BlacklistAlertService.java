@@ -2,6 +2,7 @@ package eu.tango.scamscreener.blacklist;
 
 import eu.tango.scamscreener.chat.trigger.TriggerContext;
 import eu.tango.scamscreener.lookup.PlayerLookup;
+import eu.tango.scamscreener.rules.ScamRules;
 import eu.tango.scamscreener.ui.DebugReporter;
 import eu.tango.scamscreener.ui.MessageDispatcher;
 import eu.tango.scamscreener.ui.Messages;
@@ -56,11 +57,17 @@ public final class BlacklistAlertService {
 		}
 
 		BlacklistManager.ScamEntry entry = uuid == null ? null : blacklist.get(uuid);
-		player.displayClientMessage(Messages.blacklistWarning(playerName, reason, entry), false);
-		NotificationService.playWarningTone();
+		if (ScamRules.showBlacklistWarningMessage()) {
+			player.displayClientMessage(Messages.blacklistWarning(playerName, reason, entry), false);
+		}
+		if (ScamRules.pingOnBlacklistWarning()) {
+			NotificationService.playWarningTone();
+		}
 		if (autoLeaveEnabledSupplier != null && autoLeaveEnabledSupplier.getAsBoolean()) {
 			MessageDispatcher.sendCommand("p leave");
-			player.displayClientMessage(Messages.autoLeaveExecuted(playerName), false);
+			if (ScamRules.showAutoLeaveMessage()) {
+				player.displayClientMessage(Messages.autoLeaveExecuted(playerName), false);
+			}
 			debugReporter.debugTrade("auto leave triggered for blacklisted player=" + playerName + " uuid=" + uuid);
 		}
 	}
