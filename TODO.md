@@ -24,5 +24,21 @@
 
 ## Open
 
+### ChatGPT Stage
+- [ ] implement ChatGPT API Backbone which only returns a JSON String with a Score for the Scam Evaluation
+- [ ] implement LLM Stage for context understanding
+- [ ] decide when to ask ChatGPT and when not, to avoid unnecessary API responses and costs
+- [ ] implement a protection against abusive behavior towords API requests, to avoid unnecessary costs
+- [ ] make sure no private information is going through ChatGPTs API. 
+- [ ] use ChatGPTs Evaluation to train Local API, furthermore the goal is to use API less every time a request is send. so local API might be possible to understand simple context
 
+### Karma System
+- [ ] implement a Karma System, reward players that are being nice to you
+> Check for Hypixel Rules to use such a system as it might be against the rules to keep track of players behavior
+
+### Dungeon Death Tracker
+- [ ] Keep track of People often dying in Dungeons. store them in a file with reason and count it up everytime they die
+- [ ] Also fetch from Hypixel API the number of runs the players in party did to calculate a Ratio
+- [ ] send warning if a Player that dies often is in your dungeon party. optional auto-leave
+- [ ] add this festure to the Settings Menu
 
