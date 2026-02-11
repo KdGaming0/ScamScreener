@@ -4,7 +4,12 @@ import eu.tango.scamscreener.chat.parser.ChatLineParser;
 import eu.tango.scamscreener.pipeline.model.MessageContext;
 import eu.tango.scamscreener.pipeline.model.MessageEvent;
 
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 public final class MessageEventParser {
+	private static final Pattern COLOR_CODE_PATTERN = Pattern.compile("\\u00A7.");
+
 	private MessageEventParser() {
 	}
 
@@ -16,13 +21,39 @@ public final class MessageEventParser {
 		if (parsed == null) {
 			return null;
 		}
+		ChannelContext channelContext = detectChannelContext(rawLine);
 
 		return MessageEvent.from(
 			parsed.playerName(),
 			parsed.message(),
 			timestampMs,
-			MessageContext.UNKNOWN,
-			null
+			channelContext.context(),
+			channelContext.channel()
 		);
+	}
+
+	private static ChannelContext detectChannelContext(String rawLine) {
+		if (rawLine == null || rawLine.isBlank()) {
+			return new ChannelContext(MessageContext.UNKNOWN, "unknown");
+		}
+
+		String cleaned = COLOR_CODE_PATTERN.matcher(rawLine).replaceAll("").trim().toLowerCase(Locale.ROOT);
+		if (cleaned.isBlank()) {
+			return new ChannelContext(MessageContext.UNKNOWN, "unknown");
+		}
+		if (cleaned.startsWith("party >")) {
+			return new ChannelContext(MessageContext.PARTY, "party");
+		}
+		if (cleaned.startsWith("guild >") || cleaned.startsWith("officer >") || cleaned.startsWith("team >")) {
+			return new ChannelContext(MessageContext.TEAM, "team");
+		}
+		if (cleaned.startsWith("from ") || cleaned.startsWith("to ")
+			|| cleaned.startsWith("whisper from ") || cleaned.startsWith("whisper to ")) {
+			return new ChannelContext(MessageContext.GENERAL, "pm");
+		}
+		return new ChannelContext(MessageContext.GENERAL, "public");
+	}
+
+	private record ChannelContext(MessageContext context, String channel) {
 	}
 }

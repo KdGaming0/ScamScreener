@@ -26,18 +26,18 @@ public final class TrainingCommandHandler {
 	}
 
 	public int captureChatAsTrainingData(String playerName, int label, int count) {
-		List<String> lines = trainingDataService.recentLinesForPlayer(playerName, count);
-		if (lines.isEmpty()) {
+		List<TrainingDataService.CapturedChat> captures = trainingDataService.recentCapturedForPlayer(playerName, count);
+		if (captures.isEmpty()) {
 			MessageDispatcher.reply(Messages.noChatToCapture());
 			return 0;
 		}
 
 		try {
-			trainingDataService.appendRows(lines, label);
-			if (lines.size() == 1) {
+			trainingDataService.appendCapturedRows(captures, label);
+			if (captures.size() == 1) {
 				MessageDispatcher.reply(Messages.trainingSampleSaved(trainingDataService.trainingDataPath().toString(), label));
 			} else {
-				MessageDispatcher.reply(Messages.trainingSamplesSaved(trainingDataService.trainingDataPath().toString(), label, lines.size()));
+				MessageDispatcher.reply(Messages.trainingSamplesSaved(trainingDataService.trainingDataPath().toString(), label, captures.size()));
 			}
 			return 1;
 		} catch (IOException e) {
@@ -67,14 +67,14 @@ public final class TrainingCommandHandler {
 	}
 
 	public int captureBulkLegit(int count) {
-		List<String> lines = trainingDataService.recentLines(count);
-		if (lines.isEmpty()) {
+		List<TrainingDataService.CapturedChat> captures = trainingDataService.recentCaptured(count);
+		if (captures.isEmpty()) {
 			MessageDispatcher.reply(Messages.noChatToCapture());
 			return 0;
 		}
 		try {
-			trainingDataService.appendRows(lines, LEGIT_LABEL);
-			MessageDispatcher.reply(Messages.trainingSamplesSaved(trainingDataService.trainingDataPath().toString(), LEGIT_LABEL, lines.size()));
+			trainingDataService.appendCapturedRows(captures, LEGIT_LABEL);
+			MessageDispatcher.reply(Messages.trainingSamplesSaved(trainingDataService.trainingDataPath().toString(), LEGIT_LABEL, captures.size()));
 			return 1;
 		} catch (IOException e) {
 			LOGGER.warn("Failed to save bulk legit samples", e);

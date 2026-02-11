@@ -44,6 +44,7 @@ Every parsed player chat line is processed through:
 - `BehaviorSignalStage` (behavior flags)
 - `AiSignalStage` (local model probability-based signal)
 - `TrendSignalStage` (multi-message trend bonus)
+- `FunnelSignalStage` (intent sequence funnel bonus)
 - `ScoringStage`, `DecisionStage` (threshold + dedupe), `OutputStage`
 
 When thresholds are reached:

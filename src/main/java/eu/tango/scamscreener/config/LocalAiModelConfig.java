@@ -2,6 +2,7 @@ package eu.tango.scamscreener.config;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import eu.tango.scamscreener.ai.AiFeatureSpace;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -15,37 +16,15 @@ import java.util.Map;
 public final class LocalAiModelConfig {
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Path FILE_PATH = ScamScreenerPaths.inModConfigDir("scam-screener-local-ai-model.json");
-	private static final Path LEGACY_FILE_PATH = ScamScreenerPaths.inRootConfigDir("scam-screener-local-ai-model.json");
 
-	public int version = 1;
-	public double intercept = -2.10;
-	public double hasPaymentWords = 1.05;
-	public double hasAccountWords = 1.30;
-	public double hasUrgencyWords = 0.65;
-	public double hasTrustWords = 0.45;
-	public double hasTooGoodWords = 0.60;
-	public double hasPlatformWords = 0.50;
-	public double hasLink = 0.95;
-	public double hasSuspiciousPunctuation = 0.25;
-	public double ctxPushesExternalPlatform = 0.55;
-	public double ctxDemandsUpfrontPayment = 0.70;
-	public double ctxRequestsSensitiveData = 1.10;
-	public double ctxClaimsMiddlemanWithoutProof = 0.45;
-	public double ctxTooGoodToBeTrue = 0.30;
-	public double ctxRepeatedContact3Plus = 0.35;
-	public double ctxIsSpam = 0.30;
-	public double ctxAsksForStuff = 0.25;
-	public double ctxAdvertising = 0.35;
+	public int version = 9;
+	public double intercept = -2.25;
+	public Map<String, Double> denseFeatureWeights = new LinkedHashMap<>(AiFeatureSpace.defaultDenseWeights());
 	public Map<String, Double> tokenWeights = new LinkedHashMap<>();
+	public DenseHeadConfig funnelHead = DenseHeadConfig.defaultFunnelHead();
 
 	public static LocalAiModelConfig loadOrCreate() {
 		if (!Files.exists(FILE_PATH)) {
-			LocalAiModelConfig migrated = loadFromPath(LEGACY_FILE_PATH);
-			if (migrated != null) {
-				save(migrated);
-				return migrated;
-			}
-
 			LocalAiModelConfig defaults = new LocalAiModelConfig();
 			save(defaults);
 			return defaults;
@@ -55,8 +34,23 @@ public final class LocalAiModelConfig {
 		if (loaded == null) {
 			return new LocalAiModelConfig();
 		}
+		if (loaded.version < 9) {
+			loaded.version = 9;
+		}
+		if (loaded.denseFeatureWeights == null || loaded.denseFeatureWeights.isEmpty()) {
+			loaded.denseFeatureWeights = new LinkedHashMap<>(AiFeatureSpace.defaultDenseWeights());
+		} else {
+			for (Map.Entry<String, Double> entry : AiFeatureSpace.defaultDenseWeights().entrySet()) {
+				loaded.denseFeatureWeights.putIfAbsent(entry.getKey(), entry.getValue());
+			}
+		}
 		if (loaded.tokenWeights == null) {
 			loaded.tokenWeights = new LinkedHashMap<>();
+		}
+		if (loaded.funnelHead == null) {
+			loaded.funnelHead = DenseHeadConfig.fromMainHead(loaded.intercept, loaded.denseFeatureWeights);
+		} else {
+			loaded.funnelHead.normalizeFromMain(loaded.intercept, loaded.denseFeatureWeights);
 		}
 		return loaded;
 	}
@@ -81,5 +75,55 @@ public final class LocalAiModelConfig {
 
 	public static Path filePath() {
 		return FILE_PATH;
+	}
+
+	public static final class DenseHeadConfig {
+		public double intercept = -2.25;
+		public Map<String, Double> denseFeatureWeights = new LinkedHashMap<>(AiFeatureSpace.defaultFunnelDenseWeights());
+
+		public DenseHeadConfig() {
+		}
+
+		public static DenseHeadConfig defaultFunnelHead() {
+			DenseHeadConfig head = new DenseHeadConfig();
+			head.intercept = -2.25;
+			head.denseFeatureWeights = new LinkedHashMap<>(AiFeatureSpace.defaultFunnelDenseWeights());
+			return head;
+		}
+
+		public static DenseHeadConfig fromMainHead(double mainIntercept, Map<String, Double> mainDense) {
+			DenseHeadConfig head = defaultFunnelHead();
+			head.intercept = mainIntercept;
+			head.normalizeFromMain(mainIntercept, mainDense);
+			return head;
+		}
+
+		public void normalizeFromMain(double fallbackIntercept, Map<String, Double> mainDense) {
+			if (denseFeatureWeights == null) {
+				denseFeatureWeights = new LinkedHashMap<>();
+			}
+			Map<String, Double> defaults = AiFeatureSpace.defaultFunnelDenseWeights();
+			for (Map.Entry<String, Double> entry : defaults.entrySet()) {
+				String key = entry.getKey();
+				if (denseFeatureWeights.containsKey(key)) {
+					continue;
+				}
+				double fallbackWeight = 0.0;
+				if (mainDense != null) {
+					Double fromMain = mainDense.get(key);
+					if (fromMain != null) {
+						fallbackWeight = fromMain;
+					}
+				}
+				if (fallbackWeight == 0.0) {
+					fallbackWeight = entry.getValue();
+				}
+				denseFeatureWeights.put(key, fallbackWeight);
+			}
+			denseFeatureWeights.entrySet().removeIf(entry -> !AiFeatureSpace.isFunnelDenseFeature(entry.getKey()));
+			if (!Double.isFinite(intercept)) {
+				intercept = fallbackIntercept;
+			}
+		}
 	}
 }

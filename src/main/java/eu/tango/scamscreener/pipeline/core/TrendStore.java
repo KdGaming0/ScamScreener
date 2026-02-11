@@ -5,10 +5,10 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import eu.tango.scamscreener.pipeline.model.MessageEvent;
 import eu.tango.scamscreener.pipeline.model.Signal;
+import eu.tango.scamscreener.util.TextUtil;
 
 public final class TrendStore {
 	private static final long TREND_WINDOW_MILLIS = 45_000L;
@@ -28,7 +28,7 @@ public final class TrendStore {
 			return TrendEvaluation.empty();
 		}
 
-		String key = event.playerName().toLowerCase(Locale.ROOT);
+		String key = TextUtil.anonymizedSpeakerKey(event.playerName());
 		long now = event.timestampMs() > 0 ? event.timestampMs() : System.currentTimeMillis();
 		Deque<TrendRecord> history = historyByPlayer.computeIfAbsent(key, ignored -> new ArrayDeque<>());
 

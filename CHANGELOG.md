@@ -1,6 +1,43 @@
 # Changelog
 All notable changes to this project are documented in this file.
 
+## [0.16.x] - 2026-02-10 to 2026-02-11
+
+### Added
+- New `FunnelSignalStage` with per-player sequence tracking (ring buffer + TTL) and funnel evidence in warnings.
+- Intent tagging layer (`IntentTagger`) with tags for offer/rep/redirect/instruction/payment/community anchor.
+- Obfuscation-aware redirect detection for variants like spaced or leetspeak platform mentions.
+- Configurable funnel settings and intent patterns in rules config (window size/time, weights, negative-intent patterns).
+- Channel-aware message context parsing (`pm`, `party`, `team`, `public`) for pipeline and training features.
+- New AI feature stack with dense feature space + funnel context tracker (`AiFeatureSpace`, `AiFunnelContextTracker`).
+- Expanded training CSV schema with conversation/window and funnel-aware fields (`window_id`, intent fields, stage hits, funnel metrics, hard negatives, sample weights).
+- Additional AI rule signal: `LOCAL_AI_FUNNEL_SIGNAL` plus dedicated funnel tuning config (`localAiFunnelMaxScore`, `localAiFunnelThresholdBonus`).
+- Warning action tag `[block]` to run `/block <player>` from risk messages.
+- Model update metadata now includes model schema version in `scripts/model-version.json`.
+
+### Changed
+- Detection pipeline order updated so Funnel runs before AI scoring, allowing the model to consume live funnel context.
+- Local AI model format and training were reworked to support dense+token scoring and a dedicated funnel head (`funnelHead`) in the same model file.
+- Local AI trainer now trains main and funnel heads from the same CSV (funnel labels inferred from funnel markers).
+- Auto-captured training samples now persist full detection-aware feature rows instead of plain text-only rows.
+- Local AI scoring can emit multiple AI signals in one pass (general + funnel-focused).
+- Funnel-AI trigger threshold and max score are sourced from `ScamRulesConfig` (no hardcoded trigger values).
+- Model updater validates schema and preserves/normalizes funnel-head weights on apply/merge.
+- Model version update script validates schema before calculating SHA and publishing metadata.
+- Warning action tags use direct one-click command execution (`[legit]`, `[scam]`, `[blacklist]`, `[block]`).
+- Internal player tracking/training/debug flow now uses anonymized speaker keys and anonymized training capture context.
+
+### Removed
+- Removed legacy training flag pipeline (`TrainingFlags`, `TrainingTypeAiClassifier`).
+- Removed legacy local-model migration path from root config for AI model loading.
+
+### Fixed
+- System-message filtering was tightened for party/trade/co-op lines so they stay out of detection/training.
+- Chat lines starting with `[NPC]` are treated as system messages and excluded from player detection/training capture.
+
+### Kept
+- Risk warning messages still show the real player name for in-game risk message context.
+
 ## [0.15.3] - 2026-02-09
 
 ### Added
@@ -51,4 +88,3 @@ All notable changes to this project are documented in this file.
 - Shared screen logic centralized (layout, footer buttons, toggle line formatting, screen navigation).
 - `Messages` and `DebugMessages` migrated to shared builder helpers (less duplication, no bridges).
 - `ClientTickController` simplified and moved to a settings-open request flow.
-

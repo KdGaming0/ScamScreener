@@ -14,6 +14,12 @@ import eu.tango.scamscreener.pipeline.model.SignalSource;
 public final class RuleSignalStage {
 	private static final Pattern URGENCY_ALLOWLIST = Pattern.compile("\\b(auction|ah|flip|bin|bid|bidding)\\b");
 	private static final Pattern TRADE_CONTEXT_ALLOWLIST = Pattern.compile("\\b(sell|selling|buy|buying|trade|trading|price|coins?|payment|pay|lf|lb)\\b");
+	private static final Pattern COERCION_THREAT_PATTERN = Pattern.compile(
+		"\\b(?:you\\s+will\\s+not\\s+get\\s+(?:your|ur)\\s+(?:stuff|items?|armor|gear)\\s+back"
+			+ "|you\\s+won\\s+t\\s+get\\s+(?:your|ur)\\s+(?:stuff|items?|armor|gear)\\s+back"
+			+ "|well\\s+then\\s+you\\s+will\\s+not\\s+get\\s+(?:your|ur)\\s+(?:stuff|items?|armor|gear)\\s+back"
+			+ "|unless\\s+you\\s+(?:join|come)\\s+(?:vc|voice\\s+chat|voice\\s+channel|call))\\b"
+	);
 	private static final Pattern DISCORD_HANDLE_PATTERN = Pattern.compile("@[a-z0-9._-]{2,32}");
 	private static final Pattern DISCORD_WORD_PATTERN = Pattern.compile("\\bdiscord\\b");
 	private static final int ENTROPY_MIN_TOKENS = 4;
@@ -99,7 +105,17 @@ public final class RuleSignalStage {
 		if (ruleConfig.isEnabled(ScamRules.ScamRule.PRESSURE_AND_URGENCY)) {
 			PhraseScore urgencyScore = scorePhrase(message, URGENCY_KEYWORDS, URGENCY_PHRASES);
 			boolean hasSuspiciousContext = hasSuspiciousContext(message, patterns, behaviorPatterns);
-			if (urgencyScore.score() >= URGENCY_SCORE_THRESHOLD && !(URGENCY_ALLOWLIST.matcher(message).find() && !hasSuspiciousContext)
+			String coercionMatch = firstMatch(COERCION_THREAT_PATTERN, message);
+			if (coercionMatch != null) {
+				signals.add(new Signal(
+					ScamRules.ScamRule.PRESSURE_AND_URGENCY.name(),
+					SignalSource.RULE,
+					20,
+					"Coercion/extortion wording: \"" + coercionMatch + "\" (+20)",
+					ScamRules.ScamRule.PRESSURE_AND_URGENCY,
+					List.of()
+				));
+			} else if (urgencyScore.score() >= URGENCY_SCORE_THRESHOLD && !(URGENCY_ALLOWLIST.matcher(message).find() && !hasSuspiciousContext)
 				&& !(TRADE_CONTEXT_ALLOWLIST.matcher(message).find() && !hasSuspiciousContext)) {
 				signals.add(new Signal(
 					ScamRules.ScamRule.PRESSURE_AND_URGENCY.name(),

@@ -1,4 +1,4 @@
-# TODOs
+﻿# TODOs
 
 ## Done
 
@@ -22,15 +22,51 @@
 - [x] Implemented as soft dependency
 - [x] Added ModMenu config entrypoint to open ScamScreener settings
 
-## Open
+### FunnelSignalStage (Context via Sequences)
+- [x] Add `FunnelSignalStage` as a stateful, per-player stage (ringbuffer + TTL)
+- [x] Run it late in the pipeline (after normalization/regex/similarity, before scoring/decision)
+- [x] Store per-player last N messages (e.g. 20) with timestamps + channel (PM/Public/Party)
+- [x] Derive `IntentTags` per message using existing signals (regex + similarity):
+  - SERVICE_OFFER / FREE_OFFER
+  - REP_REQUEST
+  - PLATFORM_REDIRECT (Discord/VC/links)
+  - INSTRUCTION_INJECTION (go to #, type, do rep @, etc.)
+  - PAYMENT_UPFRONT (optional)
+  - COMMUNITY_ANCHOR (sbz/hsb/sbm etc., optional)
+- [x] Implement sequence scoring (time-bounded):
+  - OFFER -> REP -> REDIRECT -> INSTRUCTION
+  - Partial funnels (REP+REDIRECT, REDIRECT+INSTRUCTION) should still raise risk
+- [x] Emit funnel evidence for UI:
+  - steps + minimal snippets (only messages that contributed)
+  - funnelScoreDelta + funnelLevel mapping (optional)
 
-### ChatGPT Stage
-- [ ] implement ChatGPT API Backbone which only returns a JSON String with a Score for the Scam Evaluation
-- [ ] implement LLM Stage for context understanding
-- [ ] decide when to ask ChatGPT and when not, to avoid unnecessary API responses and costs
-- [ ] implement a protection against abusive behavior towords API requests, to avoid unnecessary costs
-- [ ] make sure no private information is going through ChatGPTs API. 
-- [ ] use ChatGPTs Evaluation to train Local API, furthermore the goal is to use API less every time a request is send. so local API might be possible to understand simple context
+### Intent Tagging (Reuse Existing Stages)
+- [x] Implement `IntentTagger` that consumes existing stage outputs (no duplicate heavy parsing)
+- [x] Add obfuscation folding (e.g. `d i s c o r d`, `disc0rd`, `d!scord`) using your similarity/levenshtein utilities
+- [x] Move intent keywords/patterns into config (easy tuning without code changes)
+- [x] Add negative intent patterns to reduce false positives (guild recruiting, legit service ads)
+
+### Local Training Improvements (Keywords -> Better Model, Less Noise)
+- [x] Expand training data format to support:
+  - label per message AND label per conversation window
+  - SAFE / BENIGN examples (critical for reducing false positives)
+- [x] Save additional features per training row:
+  - intentTags
+  - stageHits (which regex/similarity matched)
+  - channel + time delta since last message
+  - current funnel step index (if any)
+- [x] Add "hard negative" training:
+  - messages that look suspicious but are confirmed benign (e.g., guild recruiting with discord)
+- [x] Add "dedupe & weighting":
+  - downweight repeated spam lines
+  - avoid overfitting to one player's phrasing
+
+### Performance & Storage
+- [x] Ensure per-message complexity stays O(window_size)
+- [x] Implement TTL cleanup for player contexts (memory cap)
+- [x] Add config toggles: enable/disable FunnelStage, set window size, set time limits
+
+## Open
 
 ### Karma System
 - [ ] implement a Karma System, reward players that are being nice to you
@@ -42,3 +78,21 @@
 - [ ] send warning if a Player that dies often is in your dungeon party. optional auto-leave
 - [ ] add this festure to the Settings Menu
 
+# Funnel Stage
+
+## Evaluation & Regression Safety
+- [ ] Add unit tests for FunnelSignalStage:
+  - benign service offer only => low/no funnel
+  - discord mention only => low
+  - rep request + discord + instruction => high
+  - full chain => critical
+- [ ] Add regression tests for common false positives:
+  - guild recruiting posts
+  - legit carry ads without redirect/instruction
+- [ ] Add metrics logging (local):
+  - false positive rate (user-marked)
+  - funnel detection rate
+  - threshold boundary cases (uncertain decisions)
+
+## Performance & Storage
+- [ ] Ensure stored training logs are privacy-safe (optional hashing/redaction)

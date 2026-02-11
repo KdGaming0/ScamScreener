@@ -7,6 +7,7 @@ import eu.tango.scamscreener.ui.DebugReporter;
 import eu.tango.scamscreener.ui.MessageDispatcher;
 import eu.tango.scamscreener.ui.Messages;
 import eu.tango.scamscreener.ui.NotificationService;
+import eu.tango.scamscreener.util.TextUtil;
 import net.minecraft.client.Minecraft;
 
 import java.util.Locale;
@@ -42,7 +43,7 @@ public final class BlacklistAlertService {
 
 		UUID uuid = playerLookup.findUuidByName(playerName);
 		boolean blacklisted = blacklist.isBlacklisted(playerName, playerLookup::findUuidByName);
-		debugReporter.debugTrade("blacklist trigger " + context.name().toLowerCase(Locale.ROOT) + " player=" + playerName + " blacklisted=" + blacklisted);
+		debugReporter.debugTrade("blacklist trigger " + context.name().toLowerCase(Locale.ROOT) + " speaker=" + TextUtil.anonymizedSpeakerKey(playerName) + " blacklisted=" + blacklisted);
 		if (!blacklisted) {
 			return;
 		}
@@ -72,7 +73,7 @@ public final class BlacklistAlertService {
 			if (ScamRules.showAutoLeaveMessage()) {
 				player.displayClientMessage(Messages.autoLeaveExecuted(playerName), false);
 			}
-			debugReporter.debugTrade("auto leave triggered for blacklisted player=" + playerName + " uuid=" + uuid);
+			debugReporter.debugTrade("auto leave triggered for blacklisted speaker=" + TextUtil.anonymizedSpeakerKey(playerName) + " uuid=" + uuid);
 		}
 	}
 }

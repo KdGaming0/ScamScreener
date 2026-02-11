@@ -70,8 +70,10 @@ final class RuleSettingsScreen extends GUI {
 			case TRUST_MANIPULATION -> "Trust Manipulation";
 			case SPAMMY_CONTACT_PATTERN -> "Spam Contact";
 			case MULTI_MESSAGE_PATTERN -> "Multi Message";
+			case FUNNEL_SEQUENCE_PATTERN -> "Funnel Sequence";
 			case SIMILARITY_MATCH -> "Similarity Match";
 			case LOCAL_AI_RISK_SIGNAL -> "Local AI Signal";
+			case LOCAL_AI_FUNNEL_SIGNAL -> "Local AI Funnel Signal";
 		};
 	}
 }

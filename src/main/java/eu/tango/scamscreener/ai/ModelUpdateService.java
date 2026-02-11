@@ -104,7 +104,12 @@ public final class ModelUpdateService {
 		}
 		try {
 			backupLocalModel();
-			writeModel(pendingModel.content());
+			LocalAiModelConfig incoming = parseIncomingModel(pendingModel.content());
+			if (incoming == null) {
+				reply.accept(Messages.modelUpdateFailed("unsupported model schema"));
+				return 0;
+			}
+			LocalAiModelConfig.save(incoming);
 			ScamRules.reloadConfig();
 			reply.accept(Messages.modelUpdateApplied("accepted"));
 			debug(reply, "accepted id=" + id);
@@ -128,20 +133,35 @@ public final class ModelUpdateService {
 		try {
 			backupLocalModel();
 			LocalAiModelConfig local = LocalAiModelConfig.loadOrCreate();
-			LocalAiModelConfig incoming = GSON.fromJson(pendingModel.content(), LocalAiModelConfig.class);
+			LocalAiModelConfig incoming = parseIncomingModel(pendingModel.content());
 			if (incoming == null) {
 				// Code: MU-UPDATE-001
-				reply.accept(Messages.modelUpdateFailed("invalid model payload"));
+				reply.accept(Messages.modelUpdateFailed("unsupported model schema"));
 				return 0;
 			}
-			if (incoming.tokenWeights == null) {
-				incoming.tokenWeights = new LinkedHashMap<>();
+			ensureModelShape(local);
+			ensureModelShape(incoming);
+			incoming.version = Math.max(9, Math.max(local.version, incoming.version));
+			if (local.denseFeatureWeights != null) {
+				for (Map.Entry<String, Double> entry : local.denseFeatureWeights.entrySet()) {
+					incoming.denseFeatureWeights.putIfAbsent(entry.getKey(), entry.getValue());
+				}
 			}
 			if (local.tokenWeights != null) {
 				for (Map.Entry<String, Double> entry : local.tokenWeights.entrySet()) {
 					incoming.tokenWeights.putIfAbsent(entry.getKey(), entry.getValue());
 				}
 			}
+			if (local.funnelHead != null && local.funnelHead.denseFeatureWeights != null) {
+				for (Map.Entry<String, Double> entry : local.funnelHead.denseFeatureWeights.entrySet()) {
+					incoming.funnelHead.denseFeatureWeights.putIfAbsent(entry.getKey(), entry.getValue());
+				}
+			}
+			if (local.funnelHead != null && !Double.isFinite(incoming.funnelHead.intercept)
+				&& Double.isFinite(local.funnelHead.intercept)) {
+				incoming.funnelHead.intercept = local.funnelHead.intercept;
+			}
+			incoming.funnelHead.normalizeFromMain(incoming.intercept, incoming.denseFeatureWeights);
 			LocalAiModelConfig.save(incoming);
 			ScamRules.reloadConfig();
 			reply.accept(Messages.modelUpdateApplied("merged"));
@@ -201,11 +221,8 @@ public final class ModelUpdateService {
 			downloadModel(id, pending.get(id), reply);
 			return;
 		}
-		String localVersion = String.valueOf(LocalAiModelConfig.loadOrCreate().version);
 		reply.accept(Messages.modelUpdateAvailable(Messages.modelUpdateDownloadLink(
-			"/scamscreener ai model download " + id,
-			localVersion,
-			info.version
+			"/scamscreener ai model download " + id
 		)));
 		debug(reply, "update available id=" + id);
 	}
@@ -227,6 +244,11 @@ public final class ModelUpdateService {
 				return;
 			}
 		}
+		if (parseIncomingModel(payload) == null) {
+			debug(reply, "unsupported model schema in payload");
+			reply.accept(Messages.modelUpdateFailed("unsupported model schema"));
+			return;
+		}
 
 		pending.put(id, new PendingModel(pendingModel.info(), payload));
 		latestPendingId = id;
@@ -234,9 +256,48 @@ public final class ModelUpdateService {
 		debug(reply, "downloaded id=" + id);
 	}
 
-	private static void writeModel(String payload) throws IOException {
-		Files.createDirectories(LocalAiModelConfig.filePath().getParent());
-		Files.writeString(LocalAiModelConfig.filePath(), payload, StandardCharsets.UTF_8);
+	private static LocalAiModelConfig parseIncomingModel(String payload) {
+		if (payload == null || payload.isBlank()) {
+			return null;
+		}
+		try {
+			LocalAiModelConfig parsed = GSON.fromJson(payload, LocalAiModelConfig.class);
+			if (parsed == null) {
+				return null;
+			}
+			if (parsed.version < 9) {
+				return null;
+			}
+			if (parsed.denseFeatureWeights == null || parsed.denseFeatureWeights.isEmpty()) {
+				return null;
+			}
+			ensureModelShape(parsed);
+			return parsed;
+		} catch (Exception ignored) {
+			return null;
+		}
+	}
+
+	private static void ensureModelShape(LocalAiModelConfig model) {
+		if (model == null) {
+			return;
+		}
+		model.version = Math.max(9, model.version);
+		if (model.denseFeatureWeights == null || model.denseFeatureWeights.isEmpty()) {
+			model.denseFeatureWeights = new LinkedHashMap<>(AiFeatureSpace.defaultDenseWeights());
+		} else {
+			for (Map.Entry<String, Double> entry : AiFeatureSpace.defaultDenseWeights().entrySet()) {
+				model.denseFeatureWeights.putIfAbsent(entry.getKey(), entry.getValue());
+			}
+		}
+		if (model.tokenWeights == null) {
+			model.tokenWeights = new LinkedHashMap<>();
+		}
+		if (model.funnelHead == null) {
+			model.funnelHead = LocalAiModelConfig.DenseHeadConfig.fromMainHead(model.intercept, model.denseFeatureWeights);
+		} else {
+			model.funnelHead.normalizeFromMain(model.intercept, model.denseFeatureWeights);
+		}
 	}
 
 	private static void backupLocalModel() throws IOException {

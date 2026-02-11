@@ -1,10 +1,10 @@
 package eu.tango.scamscreener.pipeline.core;
 
 import java.util.HashSet;
-import java.util.Locale;
 import java.util.Set;
 import eu.tango.scamscreener.pipeline.model.DetectionLevel;
 import eu.tango.scamscreener.pipeline.model.MessageEvent;
+import eu.tango.scamscreener.util.TextUtil;
 
 public final class WarningDeduplicator {
 	private final Set<String> seen = new HashSet<>();
@@ -16,7 +16,7 @@ public final class WarningDeduplicator {
 		if (event == null || event.playerName() == null || event.playerName().isBlank() || level == null) {
 			return false;
 		}
-		String key = "behavior-risk:" + event.playerName().toLowerCase(Locale.ROOT) + ":" + level.name();
+		String key = "behavior-risk:" + TextUtil.anonymizedSpeakerKey(event.playerName()) + ":" + level.name();
 		return seen.add(key);
 	}
 

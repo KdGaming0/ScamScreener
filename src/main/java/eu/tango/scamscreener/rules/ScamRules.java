@@ -37,6 +37,10 @@ public class ScamRules {
 		return config.behaviorPatterns();
 	}
 
+	public static FunnelConfig funnelConfig() {
+		return config.funnelConfig();
+	}
+
 	public static boolean localAiEnabled() {
 		return config.localAiEnabled();
 	}
@@ -55,6 +59,14 @@ public class ScamRules {
 
 	public static double localAiTriggerProbability() {
 		return config.localAiTriggerProbability();
+	}
+
+	public static int localAiFunnelMaxScore() {
+		return config.localAiFunnelMaxScore();
+	}
+
+	public static double localAiFunnelThresholdBonus() {
+		return config.localAiFunnelThresholdBonus();
 	}
 
 	public static String autoCaptureAlertLevelSetting() {
@@ -282,8 +294,10 @@ public class ScamRules {
 		TRUST_MANIPULATION,
 		SPAMMY_CONTACT_PATTERN,
 		MULTI_MESSAGE_PATTERN,
+		FUNNEL_SEQUENCE_PATTERN,
 		SIMILARITY_MATCH,
-		LOCAL_AI_RISK_SIGNAL
+		LOCAL_AI_RISK_SIGNAL,
+		LOCAL_AI_FUNNEL_SIGNAL
 	}
 
 	public enum ScamRiskLevel {
@@ -295,11 +309,32 @@ public class ScamRules {
 
 	public record BehaviorContext(
 		String message,
+		String channel,
+		long deltaMs,
 		boolean pushesExternalPlatform,
 		boolean demandsUpfrontPayment,
 		boolean requestsSensitiveData,
 		boolean claimsTrustedMiddlemanWithoutProof,
-		int repeatedContactAttempts
+		int repeatedContactAttempts,
+		boolean tooGoodToBeTrue,
+		boolean isSpam,
+		boolean asksForStuff,
+		boolean advertising,
+		boolean intentOffer,
+		boolean intentRep,
+		boolean intentRedirect,
+		boolean intentInstruction,
+		boolean intentPaymentUpfront,
+		boolean intentCommunityAnchor,
+		int funnelStepIndex,
+		double funnelSequenceScore,
+		boolean funnelFullChain,
+		boolean funnelPartialChain,
+		int ruleHits,
+		int similarityHits,
+		int behaviorHits,
+		int trendHits,
+		int funnelHits
 	) {
 	}
 
@@ -366,12 +401,47 @@ public class ScamRules {
 		}
 	}
 
+	public static record FunnelConfig(
+		Pattern serviceOfferPattern,
+		Pattern freeOfferPattern,
+		Pattern repRequestPattern,
+		Pattern platformRedirectPattern,
+		Pattern instructionInjectionPattern,
+		Pattern communityAnchorPattern,
+		Pattern negativeIntentPattern,
+		int windowSize,
+		long windowMillis,
+		long contextTtlMillis,
+		int fullSequenceWeight,
+		int partialSequenceWeight
+	) {
+		private static FunnelConfig from(ScamRulesConfig config) {
+			return new FunnelConfig(
+				compileOrDefault(config.funnelServiceOfferPattern, ScamRulesConfig.DEFAULT_FUNNEL_SERVICE_OFFER_PATTERN),
+				compileOrDefault(config.funnelFreeOfferPattern, ScamRulesConfig.DEFAULT_FUNNEL_FREE_OFFER_PATTERN),
+				compileOrDefault(config.funnelRepRequestPattern, ScamRulesConfig.DEFAULT_FUNNEL_REP_REQUEST_PATTERN),
+				compileOrDefault(config.funnelPlatformRedirectPattern, ScamRulesConfig.DEFAULT_FUNNEL_PLATFORM_REDIRECT_PATTERN),
+				compileOrDefault(config.funnelInstructionInjectionPattern, ScamRulesConfig.DEFAULT_FUNNEL_INSTRUCTION_INJECTION_PATTERN),
+				compileOrDefault(config.funnelCommunityAnchorPattern, ScamRulesConfig.DEFAULT_FUNNEL_COMMUNITY_ANCHOR_PATTERN),
+				compileOrDefault(config.funnelNegativeIntentPattern, ScamRulesConfig.DEFAULT_FUNNEL_NEGATIVE_INTENT_PATTERN),
+				config.funnelWindowSize,
+				config.funnelWindowMillis,
+				config.funnelContextTtlMillis,
+				config.funnelFullSequenceWeight,
+				config.funnelPartialSequenceWeight
+			);
+		}
+	}
+
 	private record RuntimeConfig(
 		PatternSet patterns,
 		BehaviorPatternSet behaviorPatterns,
+		FunnelConfig funnelConfig,
 		boolean localAiEnabled,
 		int localAiMaxScore,
 		double localAiTriggerProbability,
+		int localAiFunnelMaxScore,
+		double localAiFunnelThresholdBonus,
 		ScamRiskLevel minimumAlertRiskLevel,
 		AutoCaptureAlertLevel autoCaptureAlertLevel,
 		boolean showScamWarningMessage,
@@ -406,9 +476,12 @@ public class ScamRules {
 			return new RuntimeConfig(
 				PatternSet.from(config),
 				BehaviorPatternSet.from(config),
+				FunnelConfig.from(config),
 				config.localAiEnabled,
 				config.localAiMaxScore,
 				config.localAiTriggerProbability,
+				config.localAiFunnelMaxScore,
+				config.localAiFunnelThresholdBonus,
 				parseRiskLevelOrDefault(config.minAlertRiskLevel, ScamRiskLevel.HIGH),
 				AutoCaptureAlertLevel.parseOrDefault(config.autoCaptureAlertLevel, AutoCaptureAlertLevel.OFF),
 				config.showScamWarningMessage,

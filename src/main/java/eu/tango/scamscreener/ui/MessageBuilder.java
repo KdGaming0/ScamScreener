@@ -161,8 +161,10 @@ public abstract class MessageBuilder {
 			case TRUST_MANIPULATION -> "Trust Manipulation";
 			case SPAMMY_CONTACT_PATTERN -> "Spammy Contact Pattern";
 			case MULTI_MESSAGE_PATTERN -> "Multi-Message Pattern";
+			case FUNNEL_SEQUENCE_PATTERN -> "Funnel Sequence Pattern";
 			case SIMILARITY_MATCH -> "Similarity Match";
 			case LOCAL_AI_RISK_SIGNAL -> "Local AI Risk Signal";
+			case LOCAL_AI_FUNNEL_SIGNAL -> "Local AI Funnel Signal";
 		};
 
 		String detail = exactDetail == null || exactDetail.isBlank()
@@ -351,6 +353,13 @@ public abstract class MessageBuilder {
 			ChatFormatting.DARK_RED,
 			blacklistHoverText(assessment, ruleWeights),
 			canAct ? buildBlacklistCommand(target, assessment, ruleWeights) : null
+		));
+		line.append(Component.literal(" "));
+		line.append(actionTag(
+			"block",
+			ChatFormatting.DARK_RED,
+			"Add Player to Hypixel blocklist\n/block <player>",
+			canAct ? "/block " + target : null
 		));
 
 		return line;

@@ -22,8 +22,12 @@ public final class ScoringStage {
 	public DetectionResult score(MessageEvent event, List<Signal> signals) {
 		List<Signal> safeSignals = signals == null ? List.of() : List.copyOf(signals);
 		double total = safeSignals.stream().mapToDouble(Signal::weight).sum();
-		boolean hasTrendBonus = safeSignals.stream().anyMatch(signal -> signal.ruleId() == ScamRules.ScamRule.MULTI_MESSAGE_PATTERN);
-		if (hasTrendBonus) {
+		boolean hasConversationBonus = safeSignals.stream().anyMatch(signal ->
+			signal.ruleId() == ScamRules.ScamRule.MULTI_MESSAGE_PATTERN
+				|| signal.ruleId() == ScamRules.ScamRule.FUNNEL_SEQUENCE_PATTERN
+				|| signal.ruleId() == ScamRules.ScamRule.LOCAL_AI_FUNNEL_SIGNAL
+		);
+		if (hasConversationBonus) {
 			total = Math.min(100, total);
 		}
 

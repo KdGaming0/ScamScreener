@@ -17,4 +17,9 @@ public interface RuleConfig {
 	 * Whether a specific rule is enabled.
 	 */
 	boolean isEnabled(ScamRules.ScamRule rule);
+
+	/**
+	 * Returns funnel detection config (patterns + windowing).
+	 */
+	ScamRules.FunnelConfig funnelConfig();
 }

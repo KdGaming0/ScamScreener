@@ -31,6 +31,7 @@ import eu.tango.scamscreener.ui.ChatDecorator;
 import eu.tango.scamscreener.ui.DebugReporter;
 import eu.tango.scamscreener.ui.MessageDispatcher;
 import eu.tango.scamscreener.ui.NotificationService;
+import eu.tango.scamscreener.util.TextUtil;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.message.v1.ClientReceiveMessageEvents;
@@ -41,7 +42,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.util.List;
 import eu.tango.scamscreener.security.EmailSafety;
 import eu.tango.scamscreener.security.DiscordSafety;
 import eu.tango.scamscreener.security.OutgoingMessageGuard;
@@ -211,7 +211,7 @@ public class ScamScreenerClient implements ClientModInitializer {
 		}
 
 		boolean blacklisted = BLACKLIST.isBlacklisted(parsed.playerName(), playerLookup::findUuidByName);
-		debugReporter.debugChatColor("line player=" + parsed.playerName() + " blacklisted=" + blacklisted);
+		debugReporter.debugChatColor("line speaker=" + TextUtil.anonymizedSpeakerKey(parsed.playerName()) + " blacklisted=" + blacklisted);
 		Component decorated = ChatDecorator.decoratePlayerLine(message, parsed, blacklisted);
 		Minecraft client = Minecraft.getInstance();
 		if (client != null) {
@@ -284,7 +284,7 @@ public class ScamScreenerClient implements ClientModInitializer {
 		}
 
 		try {
-			trainingDataService.appendRows(List.of(event.rawMessage()), 1);
+			trainingDataService.appendDetectedEvent(event, outcome.result(), 1);
 		} catch (IOException e) {
 			LOGGER.debug("Failed to auto-save flagged message as training sample", e);
 		}

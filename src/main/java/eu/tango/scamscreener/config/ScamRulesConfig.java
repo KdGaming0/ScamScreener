@@ -24,11 +24,14 @@ public final class ScamRulesConfig {
 	public static final String DEFAULT_ACCOUNT_DATA_PATTERN = "\\b(password|passwort|2fa|code|email login)\\b";
 	public static final String DEFAULT_TOO_GOOD_PATTERN = "\\b(free coins|free rank|dupe|100% safe|garantiert)\\b";
 	public static final String DEFAULT_TRUST_BAIT_PATTERN = "\\b(trust me|vertrau mir|legit)\\b";
-	public static final String DEFAULT_EXTERNAL_PLATFORM_PATTERN = "\\b(discord|telegram|t\\.me|dm me|add me)\\b";
+	public static final String LEGACY_EXTERNAL_PLATFORM_PATTERN = "\\b(discord|telegram|t\\.me|dm me|add me)\\b";
+	public static final String DEFAULT_EXTERNAL_PLATFORM_PATTERN = "\\b(discord|telegram|t\\.me|dm me|add me|vc|voice chat|voice channel|call)\\b";
 	public static final String DEFAULT_MIDDLEMAN_PATTERN = "\\b(trusted middleman|legit middleman|middleman)\\b";
 	public static final boolean DEFAULT_LOCAL_AI_ENABLED = true;
 	public static final int DEFAULT_LOCAL_AI_MAX_SCORE = 22;
-	public static final double DEFAULT_LOCAL_AI_TRIGGER_PROBABILITY = 0.56;
+	public static final double DEFAULT_LOCAL_AI_TRIGGER_PROBABILITY = 0.620;
+	public static final int DEFAULT_LOCAL_AI_FUNNEL_MAX_SCORE = 30;
+	public static final double DEFAULT_LOCAL_AI_FUNNEL_THRESHOLD_BONUS = 0.05;
 	public static final String DEFAULT_MIN_ALERT_RISK_LEVEL = "HIGH";
 	public static final String DEFAULT_AUTO_CAPTURE_ALERT_LEVEL = "OFF";
 	public static final boolean DEFAULT_AUTO_LEAVE_ON_BLACKLIST = false;
@@ -50,6 +53,20 @@ public final class ScamRulesConfig {
 	public static final int DEFAULT_SIMILARITY_MAX_TRAINING_SAMPLES = 250;
 	public static final int DEFAULT_SIMILARITY_MAX_COMPARE_LENGTH = 160;
 	public static final int DEFAULT_SIMILARITY_MIN_MESSAGE_LENGTH = 6;
+	public static final String DEFAULT_FUNNEL_SERVICE_OFFER_PATTERN = "\\b(carry|service|offer|offering|sell|selling|helping)\\b";
+	public static final String DEFAULT_FUNNEL_FREE_OFFER_PATTERN = "\\b(free|for free|giveaway|free carry)\\b";
+	public static final String DEFAULT_FUNNEL_REP_REQUEST_PATTERN = "\\b(rep|reputation|vouch|voucher|feedback|rep me|vouch me)\\b";
+	public static final String LEGACY_FUNNEL_PLATFORM_REDIRECT_PATTERN = "\\b(discord|telegram|t\\.me|vc|voice chat|call|join vc)\\b";
+	public static final String LEGACY_FUNNEL_PLATFORM_REDIRECT_PATTERN_V2 = "\\b(discord|telegram|t\\.me|vc|voice chat|call|join vc|(?:go to|join) [a-z0-9 ]{2,40} channel)\\b";
+	public static final String DEFAULT_FUNNEL_PLATFORM_REDIRECT_PATTERN = "\\b(discord|telegram|t\\.me|vc|voice chat|voice channel|call|join vc|(?:go to|join) [a-z0-9 ]{2,40} channel)\\b";
+	public static final String DEFAULT_FUNNEL_INSTRUCTION_INJECTION_PATTERN = "\\b(go to|type|do rep|copy this|run this|use command|join and)\\b";
+	public static final String DEFAULT_FUNNEL_COMMUNITY_ANCHOR_PATTERN = "\\b(sbz|hsb|sbm|skyblockz|hypixel skyblock)\\b";
+	public static final String DEFAULT_FUNNEL_NEGATIVE_INTENT_PATTERN = "\\b(guild recruit|guild req|guild only|looking for members|lf members|recruiting)\\b";
+	public static final int DEFAULT_FUNNEL_WINDOW_SIZE = 20;
+	public static final long DEFAULT_FUNNEL_WINDOW_MILLIS = 180_000L;
+	public static final long DEFAULT_FUNNEL_CONTEXT_TTL_MILLIS = 600_000L;
+	public static final int DEFAULT_FUNNEL_FULL_SEQUENCE_WEIGHT = 28;
+	public static final int DEFAULT_FUNNEL_PARTIAL_SEQUENCE_WEIGHT = 14;
 
 	private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
 	private static final Path FILE_PATH = ScamScreenerPaths.inModConfigDir("scam-screener-rules.json");
@@ -68,6 +85,8 @@ public final class ScamRulesConfig {
 	public boolean localAiEnabled = DEFAULT_LOCAL_AI_ENABLED;
 	public int localAiMaxScore = DEFAULT_LOCAL_AI_MAX_SCORE;
 	public double localAiTriggerProbability = DEFAULT_LOCAL_AI_TRIGGER_PROBABILITY;
+	public Integer localAiFunnelMaxScore = DEFAULT_LOCAL_AI_FUNNEL_MAX_SCORE;
+	public Double localAiFunnelThresholdBonus = DEFAULT_LOCAL_AI_FUNNEL_THRESHOLD_BONUS;
 	public String minAlertRiskLevel = DEFAULT_MIN_ALERT_RISK_LEVEL;
 	public String autoCaptureAlertLevel = DEFAULT_AUTO_CAPTURE_ALERT_LEVEL;
 	public boolean autoLeaveOnBlacklist = DEFAULT_AUTO_LEAVE_ON_BLACKLIST;
@@ -89,6 +108,18 @@ public final class ScamRulesConfig {
 	public int similarityMaxTrainingSamples = DEFAULT_SIMILARITY_MAX_TRAINING_SAMPLES;
 	public int similarityMaxCompareLength = DEFAULT_SIMILARITY_MAX_COMPARE_LENGTH;
 	public int similarityMinMessageLength = DEFAULT_SIMILARITY_MIN_MESSAGE_LENGTH;
+	public String funnelServiceOfferPattern = DEFAULT_FUNNEL_SERVICE_OFFER_PATTERN;
+	public String funnelFreeOfferPattern = DEFAULT_FUNNEL_FREE_OFFER_PATTERN;
+	public String funnelRepRequestPattern = DEFAULT_FUNNEL_REP_REQUEST_PATTERN;
+	public String funnelPlatformRedirectPattern = DEFAULT_FUNNEL_PLATFORM_REDIRECT_PATTERN;
+	public String funnelInstructionInjectionPattern = DEFAULT_FUNNEL_INSTRUCTION_INJECTION_PATTERN;
+	public String funnelCommunityAnchorPattern = DEFAULT_FUNNEL_COMMUNITY_ANCHOR_PATTERN;
+	public String funnelNegativeIntentPattern = DEFAULT_FUNNEL_NEGATIVE_INTENT_PATTERN;
+	public int funnelWindowSize = DEFAULT_FUNNEL_WINDOW_SIZE;
+	public long funnelWindowMillis = DEFAULT_FUNNEL_WINDOW_MILLIS;
+	public long funnelContextTtlMillis = DEFAULT_FUNNEL_CONTEXT_TTL_MILLIS;
+	public int funnelFullSequenceWeight = DEFAULT_FUNNEL_FULL_SEQUENCE_WEIGHT;
+	public int funnelPartialSequenceWeight = DEFAULT_FUNNEL_PARTIAL_SEQUENCE_WEIGHT;
 	public Set<String> disabledRules = new LinkedHashSet<>();
 
 	public static ScamRulesConfig loadOrCreate() {
@@ -151,6 +182,8 @@ public final class ScamRulesConfig {
 		}
 		if (isBlank(externalPlatformPattern)) {
 			externalPlatformPattern = DEFAULT_EXTERNAL_PLATFORM_PATTERN;
+		} else if (LEGACY_EXTERNAL_PLATFORM_PATTERN.equals(externalPlatformPattern)) {
+			externalPlatformPattern = DEFAULT_EXTERNAL_PLATFORM_PATTERN;
 		}
 		if (isBlank(upfrontPaymentBehaviorPattern)) {
 			upfrontPaymentBehaviorPattern = DEFAULT_PAYMENT_FIRST_PATTERN;
@@ -161,8 +194,40 @@ public final class ScamRulesConfig {
 		if (isBlank(middlemanPattern)) {
 			middlemanPattern = DEFAULT_MIDDLEMAN_PATTERN;
 		}
+		if (isBlank(funnelServiceOfferPattern)) {
+			funnelServiceOfferPattern = DEFAULT_FUNNEL_SERVICE_OFFER_PATTERN;
+		}
+		if (isBlank(funnelFreeOfferPattern)) {
+			funnelFreeOfferPattern = DEFAULT_FUNNEL_FREE_OFFER_PATTERN;
+		}
+		if (isBlank(funnelRepRequestPattern)) {
+			funnelRepRequestPattern = DEFAULT_FUNNEL_REP_REQUEST_PATTERN;
+		}
+		if (isBlank(funnelPlatformRedirectPattern)) {
+			funnelPlatformRedirectPattern = DEFAULT_FUNNEL_PLATFORM_REDIRECT_PATTERN;
+		} else if (LEGACY_FUNNEL_PLATFORM_REDIRECT_PATTERN.equals(funnelPlatformRedirectPattern)
+			|| LEGACY_FUNNEL_PLATFORM_REDIRECT_PATTERN_V2.equals(funnelPlatformRedirectPattern)) {
+			funnelPlatformRedirectPattern = DEFAULT_FUNNEL_PLATFORM_REDIRECT_PATTERN;
+		}
+		if (isBlank(funnelInstructionInjectionPattern)) {
+			funnelInstructionInjectionPattern = DEFAULT_FUNNEL_INSTRUCTION_INJECTION_PATTERN;
+		}
+		if (isBlank(funnelCommunityAnchorPattern)) {
+			funnelCommunityAnchorPattern = DEFAULT_FUNNEL_COMMUNITY_ANCHOR_PATTERN;
+		}
+		if (isBlank(funnelNegativeIntentPattern)) {
+			funnelNegativeIntentPattern = DEFAULT_FUNNEL_NEGATIVE_INTENT_PATTERN;
+		}
 		localAiMaxScore = clampInt(localAiMaxScore, 0, 100, DEFAULT_LOCAL_AI_MAX_SCORE);
 		localAiTriggerProbability = clampDouble(localAiTriggerProbability, 0.0, 1.0, DEFAULT_LOCAL_AI_TRIGGER_PROBABILITY);
+		if (localAiFunnelMaxScore == null) {
+			localAiFunnelMaxScore = DEFAULT_LOCAL_AI_FUNNEL_MAX_SCORE;
+		}
+		if (localAiFunnelThresholdBonus == null) {
+			localAiFunnelThresholdBonus = DEFAULT_LOCAL_AI_FUNNEL_THRESHOLD_BONUS;
+		}
+		localAiFunnelMaxScore = clampInt(localAiFunnelMaxScore, 0, 100, DEFAULT_LOCAL_AI_FUNNEL_MAX_SCORE);
+		localAiFunnelThresholdBonus = clampDouble(localAiFunnelThresholdBonus, 0.0, 0.5, DEFAULT_LOCAL_AI_FUNNEL_THRESHOLD_BONUS);
 		levelMedium = clampInt(levelMedium, 1, 100, DEFAULT_LEVEL_MEDIUM);
 		levelHigh = clampInt(levelHigh, levelMedium + 1, 100, DEFAULT_LEVEL_HIGH);
 		levelCritical = clampInt(levelCritical, levelHigh + 1, 100, DEFAULT_LEVEL_CRITICAL);
@@ -175,6 +240,11 @@ public final class ScamRulesConfig {
 		similarityMaxTrainingSamples = clampInt(similarityMaxTrainingSamples, 10, 2000, DEFAULT_SIMILARITY_MAX_TRAINING_SAMPLES);
 		similarityMaxCompareLength = clampInt(similarityMaxCompareLength, 40, 400, DEFAULT_SIMILARITY_MAX_COMPARE_LENGTH);
 		similarityMinMessageLength = clampInt(similarityMinMessageLength, 2, 40, DEFAULT_SIMILARITY_MIN_MESSAGE_LENGTH);
+		funnelWindowSize = clampInt(funnelWindowSize, 5, 60, DEFAULT_FUNNEL_WINDOW_SIZE);
+		funnelWindowMillis = clampLong(funnelWindowMillis, 15_000L, 900_000L, DEFAULT_FUNNEL_WINDOW_MILLIS);
+		funnelContextTtlMillis = clampLong(funnelContextTtlMillis, 60_000L, 7_200_000L, DEFAULT_FUNNEL_CONTEXT_TTL_MILLIS);
+		funnelFullSequenceWeight = clampInt(funnelFullSequenceWeight, 1, 100, DEFAULT_FUNNEL_FULL_SEQUENCE_WEIGHT);
+		funnelPartialSequenceWeight = clampInt(funnelPartialSequenceWeight, 1, 100, DEFAULT_FUNNEL_PARTIAL_SEQUENCE_WEIGHT);
 		if (isBlank(minAlertRiskLevel)) {
 			minAlertRiskLevel = DEFAULT_MIN_ALERT_RISK_LEVEL;
 		}
@@ -215,6 +285,13 @@ public final class ScamRulesConfig {
 
 	private static double clampDouble(double value, double min, double max, double fallback) {
 		if (Double.isNaN(value) || value < min || value > max) {
+			return fallback;
+		}
+		return value;
+	}
+
+	private static long clampLong(long value, long min, long max, long fallback) {
+		if (value < min || value > max) {
 			return fallback;
 		}
 		return value;

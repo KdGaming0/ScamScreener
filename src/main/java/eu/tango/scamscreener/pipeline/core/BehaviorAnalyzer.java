@@ -1,8 +1,8 @@
 package eu.tango.scamscreener.pipeline.core;
 
 import eu.tango.scamscreener.rules.ScamRules;
+import eu.tango.scamscreener.util.TextUtil;
 
-import java.util.Locale;
 import eu.tango.scamscreener.pipeline.model.BehaviorAnalysis;
 import eu.tango.scamscreener.pipeline.model.MessageEvent;
 
@@ -32,7 +32,9 @@ public final class BehaviorAnalyzer {
 		}
 
 		String normalized = event.normalizedMessage();
-		String playerKey = event.playerName() == null ? "" : event.playerName().trim().toLowerCase(Locale.ROOT);
+		String playerKey = event.playerName() == null || event.playerName().isBlank()
+			? ""
+			: TextUtil.anonymizedSpeakerKey(event.playerName());
 		if (playerKey.isBlank()) {
 			resetStreak();
 			return new BehaviorAnalysis(

@@ -35,7 +35,8 @@ public final class LevenshteinSignalStage {
 			return List.of();
 		}
 
-		String normalized = normalizeForSimilarity(event.normalizedMessage());
+		String source = event.rawMessage() == null || event.rawMessage().isBlank() ? event.normalizedMessage() : event.rawMessage();
+		String normalized = normalizeForSimilarity(source);
 		if (normalized.length() < ScamRules.similarityMinMessageLength()) {
 			return List.of();
 		}

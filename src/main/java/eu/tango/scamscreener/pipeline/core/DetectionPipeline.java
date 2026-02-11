@@ -22,6 +22,7 @@ import eu.tango.scamscreener.pipeline.stage.OutputStage;
 import eu.tango.scamscreener.pipeline.stage.RuleSignalStage;
 import eu.tango.scamscreener.pipeline.stage.ScoringStage;
 import eu.tango.scamscreener.pipeline.stage.LevenshteinSignalStage;
+import eu.tango.scamscreener.pipeline.stage.FunnelSignalStage;
 import eu.tango.scamscreener.pipeline.stage.TrendSignalStage;
 
 public final class DetectionPipeline {
@@ -33,6 +34,8 @@ public final class DetectionPipeline {
 	private final AiSignalStage aiSignalStage;
 	private final TrendStore trendStore;
 	private final TrendSignalStage trendSignalStage;
+	private final FunnelStore funnelStore;
+	private final FunnelSignalStage funnelSignalStage;
 	private final ScoringStage scoringStage;
 	private final DecisionStage decisionStage;
 	private final OutputStage outputStage;
@@ -51,6 +54,8 @@ public final class DetectionPipeline {
 		this.aiSignalStage = new AiSignalStage(new AiScorer(localAiScorer, ruleConfig));
 		this.trendStore = new TrendStore();
 		this.trendSignalStage = new TrendSignalStage(ruleConfig, trendStore);
+		this.funnelStore = new FunnelStore(ruleConfig);
+		this.funnelSignalStage = new FunnelSignalStage(ruleConfig, funnelStore);
 		this.scoringStage = new ScoringStage();
 		this.decisionStage = new DecisionStage(new WarningDeduplicator());
 		this.outputStage = new OutputStage();
@@ -59,8 +64,9 @@ public final class DetectionPipeline {
 	/**
 	 * Runs the pipeline for a single chat event. Stages are executed in this order:
 	 * {@link MuteStage} -> {@link BehaviorAnalyzer} -> {@link RuleSignalStage}
-	 * -> {@link LevenshteinSignalStage} -> {@link BehaviorSignalStage} -> {@link AiSignalStage} -> {@link TrendSignalStage}
-	 * -> {@link ScoringStage} -> {@link DecisionStage} -> {@link OutputStage}.
+	 * -> {@link LevenshteinSignalStage} -> {@link BehaviorSignalStage} -> {@link TrendSignalStage}
+	 * -> {@link FunnelSignalStage} -> {@link AiSignalStage} -> {@link ScoringStage}
+	 * -> {@link DecisionStage} -> {@link OutputStage}.
 	 */
 	public Optional<DetectionOutcome> process(MessageEvent event, Consumer<Component> reply, Runnable warningSound) {
 		Optional<MessageEvent> maybeEvent = muteStage.filter(event);
@@ -74,8 +80,9 @@ public final class DetectionPipeline {
 		signals.addAll(ruleSignalStage.collectSignals(safeEvent));
 		signals.addAll(levenshteinSignalStage.collectSignals(safeEvent));
 		signals.addAll(behaviorSignalStage.collectSignals(analysis));
-		signals.addAll(aiSignalStage.collectSignals(analysis));
 		signals.addAll(trendSignalStage.collectSignals(safeEvent, signals));
+		signals.addAll(funnelSignalStage.collectSignals(safeEvent, signals));
+		signals.addAll(aiSignalStage.collectSignals(safeEvent, analysis, signals));
 
 		DetectionResult result = scoringStage.score(safeEvent, signals);
 		DetectionDecision decision = decisionStage.decide(safeEvent, result);
@@ -88,11 +95,13 @@ public final class DetectionPipeline {
 	}
 
 	/**
-	 * Clears any stateful stage data (trend history, dedupe, repeated-contact counts).
+	 * Clears any stateful stage data (trend/funnel history, dedupe, repeated-contact counts).
 	 */
 	public void reset() {
 		behaviorAnalyzer.reset();
+		aiSignalStage.reset();
 		decisionStage.reset();
 		trendStore.reset();
+		funnelStore.reset();
 	}
 }

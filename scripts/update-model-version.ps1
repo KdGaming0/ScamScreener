@@ -8,23 +8,63 @@ if (-not (Test-Path $modelPath)) {
 	throw "Model file not found: $modelPath"
 }
 
-$hash = (Get-FileHash -Algorithm SHA256 $modelPath).Hash.ToLowerInvariant()
-$rawUrl = "https://raw.githubusercontent.com/Tangos-Mods/ScamScreener/main/scripts/scam-screener-local-ai-model.json"
+$model = Get-Content $modelPath -Raw | ConvertFrom-Json
+if ($null -eq $model.denseFeatureWeights) {
+	throw "Model schema invalid: denseFeatureWeights missing"
+}
+if ($null -eq $model.tokenWeights) {
+	throw "Model schema invalid: tokenWeights missing"
+}
+if ($null -eq $model.funnelHead) {
+	throw "Model schema invalid: funnelHead missing"
+}
+if ($null -eq $model.funnelHead.denseFeatureWeights) {
+	throw "Model schema invalid: funnelHead.denseFeatureWeights missing"
+}
 
 $version = 1
+$schemaVersion = $null
 if (Test-Path $versionPath) {
 	try {
 		$existing = Get-Content $versionPath -Raw | ConvertFrom-Json
 		if ($null -ne $existing.version) {
 			$version = [int]$existing.version + 1
 		}
+		if ($null -ne $existing.modelSchemaVersion) {
+			$schemaVersion = [int]$existing.modelSchemaVersion
+		}
 	} catch {
 		$version = 1
 	}
 }
 
+$schemaFromModel = $null
+if ($null -ne $model.PSObject.Properties["schemaVersion"]) {
+	$schemaFromModel = [int]$model.schemaVersion
+} elseif ($null -ne $model.version) {
+	$schemaFromModel = [int]$model.version
+}
+if ($null -eq $schemaVersion) {
+	$schemaVersion = $schemaFromModel
+}
+if ($null -eq $schemaVersion -or $schemaVersion -lt 9) {
+	throw "Model schema invalid: version must be >= 9"
+}
+
+$releaseVersion = $version.ToString()
+$model.version = [int]$releaseVersion
+if ($null -ne $model.PSObject.Properties["modelVersion"]) {
+	$model.PSObject.Properties.Remove("modelVersion")
+}
+$modelJson = $model | ConvertTo-Json -Depth 64
+Set-Content -Path $modelPath -Value $modelJson -Encoding UTF8
+
+$hash = (Get-FileHash -Algorithm SHA256 $modelPath).Hash.ToLowerInvariant()
+$rawUrl = "https://raw.githubusercontent.com/Tangos-Mods/ScamScreener/main/scripts/scam-screener-local-ai-model.json"
+
 $data = [ordered]@{
-	version = $version.ToString()
+	version = $releaseVersion
+	modelSchemaVersion = $schemaVersion
 	sha256 = $hash
 	url = $rawUrl
 }
@@ -34,4 +74,6 @@ Set-Content -Path $versionPath -Value $json -Encoding UTF8
 
 Write-Host "Updated model-version.json"
 Write-Host "version=$($data.version)"
+Write-Host "model.version=$($model.version)"
+Write-Host "modelSchemaVersion=$($data.modelSchemaVersion)"
 Write-Host "sha256=$($data.sha256)"

@@ -4,5 +4,6 @@ public enum SignalSource {
 	RULE,
 	BEHAVIOR,
 	AI,
-	TREND
+	TREND,
+	FUNNEL
 }

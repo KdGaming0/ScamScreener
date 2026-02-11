@@ -20,4 +20,9 @@ public final class DefaultRuleConfig implements RuleConfig {
 	public boolean isEnabled(ScamRules.ScamRule rule) {
 		return ScamRules.isRuleEnabled(rule);
 	}
+
+	@Override
+	public ScamRules.FunnelConfig funnelConfig() {
+		return ScamRules.funnelConfig();
+	}
 }

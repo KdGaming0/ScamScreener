@@ -190,14 +190,12 @@ public final class Messages extends MessageBuilder {
 		);
 	}
 
-	public static MutableComponent modelUpdateDownloadLink(String command, String localVersion, String remoteVersion) {
-		String localText = localVersion == null || localVersion.isBlank() ? "unknown" : localVersion.trim();
-		String remoteText = remoteVersion == null || remoteVersion.isBlank() ? "unknown" : remoteVersion.trim();
+	public static MutableComponent modelUpdateDownloadLink(String command) {
 		Style style = Style.EMPTY
 			.withColor(ChatFormatting.YELLOW)
 			.withClickEvent(new ClickEvent.RunCommand(command == null ? "" : command))
 			.withHoverEvent(new HoverEvent.ShowText(Component.literal("Download model update")));
-		return Component.literal("A new AI Model is available. Click to update your local model. (" + localText + " -> " + remoteText + ")")
+		return Component.literal("A new AI Model is available. Click to update your local model.")
 			.setStyle(style);
 	}
 
