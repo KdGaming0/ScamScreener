@@ -48,13 +48,16 @@ jobs:
       - name: test (${{ matrix.suite }})
         run: ./gradlew test --console=plain --tests "${{ matrix.test_pattern }}"
       - name: publish junit test report
-        if: always()
+        if: ${{ always() && (github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: dorny/test-reporter@v1
         with:
           name: JUnit Tests (${{ matrix.suite }})
           path: versions/*/build/test-results/test/TEST-*.xml
           reporter: java-junit
           fail-on-error: 'false'
+      - name: skip junit test report (restricted token)
+        if: ${{ always() && github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.actor == 'dependabot[bot]') }}
+        run: echo "Skipping dorny/test-reporter because this PR token cannot create check runs."
       - name: upload test reports
         if: always()
         uses: actions/upload-artifact@v4
