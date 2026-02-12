@@ -9,7 +9,7 @@ if (-not (Test-Path $propertiesPath)) {
 }
 
 $properties = Get-Content -Path $propertiesPath -Raw -Encoding UTF8
-$match = [regex]::Match($properties, '(?m)^\s*mod.version\s*=\s*([^\r\n#]+?)\s*$')
+$match = [regex]::Match($properties, '(?m)^\s*mod\.version\s*=\s*([^\r\n#]+?)\s*$')
 if (-not $match.Success) {
 	throw "mod.version not found in gradle.properties"
 }
